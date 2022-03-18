@@ -97,19 +97,38 @@ int getPressedButtonCode(int buttonsAnalogReaderValue) {
  return -1;
 }
 
-//Entyties declaration
+//Entities declaration
 class MenuWindow {
   public:
     MenuWindow(
       int number, 
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
-      MenuWindow* previosMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) {
         this->number = number;
         this->higherLevelMenu = higherLevelMenu;
         this->lowerLevelMenu = lowerLevelMenu;
-        this->previosMenu = previosMenu;
+        this->prevMenu = prevMenu;
+        this->nextMenu = nextMenu;
+    }
+
+    /**
+     * @brief setting up windows to create menu structure
+     * 
+     * @param higherLevelMenu BACK button
+     * @param lowerLevelMenu SELECT button
+     * @param prevMenu LEFT button
+     * @param nextMenu RIGHT button
+     */
+    void setPullOfWindows(
+      MenuWindow* higherLevelMenu = nullptr,
+      MenuWindow* lowerLevelMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
+      MenuWindow* nextMenu = nullptr) {
+        this->higherLevelMenu = higherLevelMenu;
+        this->lowerLevelMenu = lowerLevelMenu;
+        this->prevMenu = prevMenu;
         this->nextMenu = nextMenu;
     }
 
@@ -120,7 +139,7 @@ class MenuWindow {
       return this->lowerLevelMenu;
     };
     MenuWindow* onLeft() {
-      return this->previosMenu;
+      return this->prevMenu;
     };
     MenuWindow* onRight() {
       return this->nextMenu;
@@ -129,7 +148,7 @@ class MenuWindow {
     int number;
     MenuWindow* higherLevelMenu;
     MenuWindow* lowerLevelMenu;
-    MenuWindow* previosMenu;
+    MenuWindow* prevMenu;
     MenuWindow* nextMenu;
 };
 
@@ -139,12 +158,12 @@ class Main : public MenuWindow {
       int number,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
-      MenuWindow* previosMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
       number, higherLevelMenu, lowerLevelMenu,
-      previosMenu, nextMenu) {}
+      prevMenu, nextMenu) {}
 };
 
 class EngineController : public MenuWindow {
@@ -153,12 +172,12 @@ class EngineController : public MenuWindow {
       int number,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
-      MenuWindow* previosMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
       number, higherLevelMenu, lowerLevelMenu,
-      previosMenu, nextMenu) {}
+      prevMenu, nextMenu) {}
 };
 
 class Templates : public MenuWindow {
@@ -167,12 +186,12 @@ class Templates : public MenuWindow {
       int number,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
-      MenuWindow* previosMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
       number, higherLevelMenu, lowerLevelMenu,
-      previosMenu, nextMenu) {}
+      prevMenu, nextMenu) {}
 };
 
 class Calibration : public MenuWindow {
@@ -181,12 +200,12 @@ class Calibration : public MenuWindow {
       int number, 
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
-      MenuWindow* previosMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
       number, higherLevelMenu, lowerLevelMenu,
-      previosMenu, nextMenu) {}
+      prevMenu, nextMenu) {}
 };
 
 //Menu windows logic declaration
@@ -195,7 +214,18 @@ EngineController* engineController = new EngineController(1);
 Templates* templates = new Templates(2);
 Calibration* calibration = new Calibration(3);
 
+//Current window holder
+MenuWindow* currentWindow;
+
 void setup() {
+  //Menu windows init
+  mainWindow->setPullOfWindows(engineController,engineController,engineController,engineController);
+  engineController->setPullOfWindows(mainWindow, nullptr, calibration, templates);
+  templates->setPullOfWindows(mainWindow, nullptr, engineController, calibration);
+  calibration->setPullOfWindows(mainWindow, nullptr, templates, engineController);
+
+  currentWindow = mainWindow;
+
   Serial.begin(9600);
   Timer2.setFrequency(1);
   Timer2.enableISR(CHANNEL_A);
@@ -211,6 +241,8 @@ ISR(TIMER2_A)
       Serial.println("Button was pressed");
       Serial.println(pressedButtonCode);
       buttonPressedAt = millis();
+      ///////////////////////////////////////
+      Serial.println(currentWindow->number);
     }
 
     if (previouslyPressedButtonCode != -1 && pressedButtonCode == -1) {
@@ -219,6 +251,9 @@ ISR(TIMER2_A)
       buttonPressingTime = millis() - buttonPressedAt;
       Serial.println("Pressed for: ");
       Serial.println(buttonPressingTime);
+      /////////////////////////////////////////
+      currentWindow = currentWindow->onRight();
+      Serial.println(currentWindow->number);
     }
 
     previouslyPressedButtonCode = getPressedButtonCode(analogRead(B_ANALOG_READER));
