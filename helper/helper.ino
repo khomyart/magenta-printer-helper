@@ -45,6 +45,9 @@ volatile int
   currentWindowNumber  = 0,
   selectedWindowNumber = 0;
 
+volatile int 
+  currentPosition = 0;
+
 int keyboardDebugging (int analogButtonsReaderPortNumber, bool isMapingEnabled = false) {
   int analogValue = analogRead(analogButtonsReaderPortNumber);
   
@@ -133,16 +136,32 @@ class MenuWindow {
     }
 
     MenuWindow* onBack() {
-      return this->higherLevelMenu;
+      if (this->higherLevelMenu != nullptr) {
+        return this->higherLevelMenu;
+      } else {
+        return this;
+      }
     };
     MenuWindow* onSelect(){
-      return this->lowerLevelMenu;
+      if (this->lowerLevelMenu != nullptr) {
+        return this->lowerLevelMenu;
+      } else {
+        return this;
+      }
     };
     MenuWindow* onLeft() {
-      return this->prevMenu;
+      if (this->prevMenu != nullptr) {
+        return this->prevMenu;
+      } else {
+        return this;
+      }
     };
     MenuWindow* onRight() {
-      return this->nextMenu;
+      if (this->nextMenu != nullptr) {
+        return this->nextMenu;
+      } else {
+        return this;
+      }
     };
 
     int number;
@@ -152,9 +171,9 @@ class MenuWindow {
     MenuWindow* nextMenu;
 };
 
-class Main : public MenuWindow {
+class MainMenu : public MenuWindow {
   public:
-    Main(
+    MainMenu(
       int number,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -166,9 +185,9 @@ class Main : public MenuWindow {
       prevMenu, nextMenu) {}
 };
 
-class EngineController : public MenuWindow {
+class EngineControllerMenu : public MenuWindow {
   public:
-    EngineController(
+    EngineControllerMenu(
       int number,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -180,9 +199,9 @@ class EngineController : public MenuWindow {
       prevMenu, nextMenu) {}
 };
 
-class Templates : public MenuWindow {
+class TemplatesMenu : public MenuWindow {
   public:
-    Templates(
+    TemplatesMenu(
       int number,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -194,9 +213,37 @@ class Templates : public MenuWindow {
       prevMenu, nextMenu) {}
 };
 
-class Calibration : public MenuWindow {
+class CalibrationMenu : public MenuWindow {
   public:
-    Calibration(
+    CalibrationMenu(
+      int number, 
+      MenuWindow* higherLevelMenu = nullptr,
+      MenuWindow* lowerLevelMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
+      MenuWindow* nextMenu = nullptr) 
+    : 
+    MenuWindow(
+      number, higherLevelMenu, lowerLevelMenu,
+      prevMenu, nextMenu) {}
+};
+
+class ManualModeMenu : public MenuWindow {
+  public:
+    ManualModeMenu(
+      int number, 
+      MenuWindow* higherLevelMenu = nullptr,
+      MenuWindow* lowerLevelMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
+      MenuWindow* nextMenu = nullptr) 
+    : 
+    MenuWindow(
+      number, higherLevelMenu, lowerLevelMenu,
+      prevMenu, nextMenu) {}
+};
+
+class SemiAutomaticModeMenu : public MenuWindow {
+  public:
+    SemiAutomaticModeMenu(
       int number, 
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -209,22 +256,30 @@ class Calibration : public MenuWindow {
 };
 
 //Menu windows logic declaration
-Main* mainWindow = new Main(0);
-EngineController* engineController = new EngineController(1);
-Templates* templates = new Templates(2);
-Calibration* calibration = new Calibration(3);
+MainMenu* mainMenu = new MainMenu(0);
+
+EngineControllerMenu* engineControllerMenu = new EngineControllerMenu(1);
+ManualModeMenu* manualModeMenu = new ManualModeMenu(11);
+SemiAutomaticModeMenu* semiAutoModeMenu = new SemiAutomaticModeMenu(12);
+
+TemplatesMenu* templatesMenu = new TemplatesMenu(2);
+CalibrationMenu* calibrationMenu = new CalibrationMenu(3);
 
 //Current window holder
 MenuWindow* currentWindow;
 
 void setup() {
   //Menu windows init
-  mainWindow->setPullOfWindows(engineController,engineController,engineController,engineController);
-  engineController->setPullOfWindows(mainWindow, nullptr, calibration, templates);
-  templates->setPullOfWindows(mainWindow, nullptr, engineController, calibration);
-  calibration->setPullOfWindows(mainWindow, nullptr, templates, engineController);
+  mainMenu->setPullOfWindows(engineControllerMenu,engineControllerMenu,engineControllerMenu,engineControllerMenu);
+  
+  engineControllerMenu->setPullOfWindows(mainMenu, manualModeMenu, calibrationMenu, templatesMenu);
+  manualModeMenu->setPullOfWindows(engineControllerMenu, nullptr, semiAutoModeMenu, semiAutoModeMenu);
+  semiAutoModeMenu->setPullOfWindows(engineControllerMenu, nullptr, manualModeMenu, manualModeMenu);
 
-  currentWindow = mainWindow;
+  templatesMenu->setPullOfWindows(mainMenu, nullptr, engineControllerMenu, calibrationMenu);
+  calibrationMenu->setPullOfWindows(mainMenu, nullptr, templatesMenu, engineControllerMenu);
+
+  currentWindow = mainMenu;
 
   Serial.begin(9600);
   Timer2.setFrequency(1);
@@ -234,25 +289,45 @@ void setup() {
 
 ISR(TIMER2_A)
 {
-  if ((millis() - time) > 100) {
+  if ((millis() - time) > 50) {
     pressedButtonCode = getPressedButtonCode(analogRead(B_ANALOG_READER));
 
+    //on click
+    //pressedButtonCode
     if (previouslyPressedButtonCode == -1 && pressedButtonCode != -1) {
-      Serial.println("Button was pressed");
-      Serial.println(pressedButtonCode);
       buttonPressedAt = millis();
-      ///////////////////////////////////////
-      Serial.println(currentWindow->number);
+
+      /*
+        Switching between winows
+      */
+      switch (pressedButtonCode)
+      {
+      case BUTTON_BACK_C:
+        currentWindow = currentWindow->onBack();
+        break;
+      
+      case BUTTON_SELECT_C:
+        currentWindow = currentWindow->onSelect();
+        break;
+
+      case BUTTON_LEFT_C:
+        currentWindow = currentWindow->onLeft();
+        break;
+
+      case BUTTON_RIGHT_C:
+        currentWindow = currentWindow->onRight();
+        break;
+      
+      default:
+        break;
+      }
     }
 
+    //on release
+    //buttonPressingTime, previouslyPressedButtonCode
     if (previouslyPressedButtonCode != -1 && pressedButtonCode == -1) {
-      Serial.println("Button was released: ");
-      Serial.println(previouslyPressedButtonCode);
       buttonPressingTime = millis() - buttonPressedAt;
-      Serial.println("Pressed for: ");
-      Serial.println(buttonPressingTime);
-      /////////////////////////////////////////
-      currentWindow = currentWindow->onRight();
+
       Serial.println(currentWindow->number);
     }
 
