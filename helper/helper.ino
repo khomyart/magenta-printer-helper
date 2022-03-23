@@ -4,6 +4,8 @@
 
 //keyboard analog reader port number
 #define B_ANALOG_READER A6
+//measuremenet digital reader
+#define M_DIGITAL_READER 3
 
 #define BUTTONS_VALUES_WINDOW 20
 
@@ -19,6 +21,10 @@
 #define BUTTON_LEFT_C    3
 #define BUTTON_RIGHT_C   4
 
+//buttons states
+#define CLICK    0
+#define RELEASE  1
+
 //consts for map function, which translates default analog
 //signal (0 - 1023) to needed interval
 #define HIGHEST_BUTTON_SIGNAL 17
@@ -27,6 +33,9 @@
 U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_NONE);
 
 unsigned long time;
+unsigned long displayTime;
+unsigned long readerTime;
+
 //If keyboard needs calibration
 bool isKeyboardDebugEnabled = false;
 //time, when button was pressed
@@ -42,11 +51,15 @@ volatile int previouslyPressedButtonCode = -1;
 volatile int pressedButtonCode = -1;
 
 volatile int 
-  currentWindowNumber  = 0,
+  currentWindowNumber = 0,
   selectedWindowNumber = 0;
 
-volatile int 
-  currentPosition = 0;
+//Position reader variables
+bool previousReaderValue = 0;
+bool currentReaderValue = 0;
+volatile double passedHoles = 0; // value of passed holes by detector
+int amountOfHolesOnWheel = 10;
+bool direction = false; //if direction == true, platform is going up. if false - down 
 
 int keyboardDebugging (int analogButtonsReaderPortNumber, bool isMapingEnabled = false) {
   int analogValue = analogRead(analogButtonsReaderPortNumber);
@@ -100,16 +113,38 @@ int getPressedButtonCode(int buttonsAnalogReaderValue) {
  return -1;
 }
 
+/**
+ * @brief clears display
+ * 
+ */
+void clearDisplay() {
+  u8g.firstPage();
+  do {
+  } while ( u8g.nextPage() );
+};
+
 //Entities declaration
 class MenuWindow {
   public:
+    char* title;
+    int number;
+    U8GLIB_SH1106_128X64* u8g;
+    MenuWindow* higherLevelMenu;
+    MenuWindow* lowerLevelMenu;
+    MenuWindow* prevMenu;
+    MenuWindow* nextMenu;
+
     MenuWindow(
-      int number, 
+      char* title, 
+      int number,
+      U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) {
+        this->title = title;
         this->number = number;
+        this->u8g = u8g;
         this->higherLevelMenu = higherLevelMenu;
         this->lowerLevelMenu = lowerLevelMenu;
         this->prevMenu = prevMenu;
@@ -135,6 +170,16 @@ class MenuWindow {
         this->nextMenu = nextMenu;
     }
 
+    /**
+     * @brief Draws content on display
+     * 
+     */
+    void draw() {
+      this->u8g->setFont(u8g_font_helvR10);
+      this->u8g->setPrintPos(128/2 - u8g->getStrWidth(this->title)/2, 39);
+      this->u8g->print(this->title);
+    }
+
     MenuWindow* onBack() {
       if (this->higherLevelMenu != nullptr) {
         return this->higherLevelMenu;
@@ -142,133 +187,166 @@ class MenuWindow {
         return this;
       }
     };
-    MenuWindow* onSelect(){
-      if (this->lowerLevelMenu != nullptr) {
-        return this->lowerLevelMenu;
-      } else {
-        return this;
+    MenuWindow* onSelect(volatile double &passedHoles, int mode){
+      if (mode == CLICK) {
+        if (this->lowerLevelMenu != nullptr) {
+          return this->lowerLevelMenu;
+        } else {
+          return this;
+        }
       }
-    };
-    MenuWindow* onLeft() {
-      if (this->prevMenu != nullptr) {
-        return this->prevMenu;
-      } else {
-        return this;
-      }
-    };
-    MenuWindow* onRight() {
-      if (this->nextMenu != nullptr) {
-        return this->nextMenu;
-      } else {
-        return this;
-      }
-    };
 
-    int number;
-    MenuWindow* higherLevelMenu;
-    MenuWindow* lowerLevelMenu;
-    MenuWindow* prevMenu;
-    MenuWindow* nextMenu;
+      if (mode == RELEASE) {
+
+      }
+      
+    };
+    MenuWindow* onLeft(bool &direction, int mode) {
+      if (mode == CLICK) {
+        if (this->prevMenu != nullptr) {
+          return this->prevMenu;
+        } else {
+          return this;
+        }
+      }
+
+      if (mode == RELEASE) {
+      
+      }
+      
+    };
+    MenuWindow* onRight(bool &direction, int mode) {
+      if (mode == CLICK) {
+        if (this->nextMenu != nullptr) {
+          return this->nextMenu;
+        } else {
+          return this;
+        }
+      }
+
+      if (mode == RELEASE) {
+
+      }
+      
+    };
 };
 
 class MainMenu : public MenuWindow {
   public:
     MainMenu(
+      char* title,
       int number,
+      U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      number, higherLevelMenu, lowerLevelMenu,
+      title, number, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
 class EngineControllerMenu : public MenuWindow {
   public:
     EngineControllerMenu(
+      char* title,
       int number,
+      U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      number, higherLevelMenu, lowerLevelMenu,
+      title, number, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
 class TemplatesMenu : public MenuWindow {
   public:
     TemplatesMenu(
+      char* title,
       int number,
+      U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      number, higherLevelMenu, lowerLevelMenu,
+      title, number, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
 class CalibrationMenu : public MenuWindow {
   public:
     CalibrationMenu(
+      char* title,
       int number, 
+      U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      number, higherLevelMenu, lowerLevelMenu,
+      title, number, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
 class ManualModeMenu : public MenuWindow {
   public:
     ManualModeMenu(
+      char* title,
       int number, 
+      U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      number, higherLevelMenu, lowerLevelMenu,
+      title, number, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
 class SemiAutomaticModeMenu : public MenuWindow {
   public:
     SemiAutomaticModeMenu(
+      char* title,
       int number, 
+      U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      number, higherLevelMenu, lowerLevelMenu,
+      title, number, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
 //Menu windows logic declaration
-MainMenu* mainMenu = new MainMenu(0);
+MainMenu* mainMenu = new MainMenu("Main menu", 0, &u8g);
 
-EngineControllerMenu* engineControllerMenu = new EngineControllerMenu(1);
-ManualModeMenu* manualModeMenu = new ManualModeMenu(11);
-SemiAutomaticModeMenu* semiAutoModeMenu = new SemiAutomaticModeMenu(12);
+EngineControllerMenu* engineControllerMenu = new EngineControllerMenu("Engine control", 1, &u8g);
+ManualModeMenu* manualModeMenu = new ManualModeMenu("Manual control", 11, &u8g);
+SemiAutomaticModeMenu* semiAutoModeMenu = new SemiAutomaticModeMenu("Semi-auto control", 12, &u8g);
 
-TemplatesMenu* templatesMenu = new TemplatesMenu(2);
-CalibrationMenu* calibrationMenu = new CalibrationMenu(3);
+TemplatesMenu* templatesMenu = new TemplatesMenu("Templates", 2, &u8g);
+CalibrationMenu* calibrationMenu = new CalibrationMenu("Calibration", 3, &u8g);
 
 //Current window holder
 MenuWindow* currentWindow;
+MenuWindow* previousWindow;
 
 void setup() {
+  //Measurement ruler init
+  pinMode(M_DIGITAL_READER, INPUT);
+  previousReaderValue = digitalRead(M_DIGITAL_READER);
+  currentReaderValue = digitalRead(M_DIGITAL_READER);
+  
   //Menu windows init
   mainMenu->setPullOfWindows(engineControllerMenu,engineControllerMenu,engineControllerMenu,engineControllerMenu);
   
@@ -280,16 +358,39 @@ void setup() {
   calibrationMenu->setPullOfWindows(mainMenu, nullptr, templatesMenu, engineControllerMenu);
 
   currentWindow = mainMenu;
+  previousWindow = mainMenu;
 
+  clearDisplay();
   Serial.begin(9600);
   Timer2.setFrequency(1);
   Timer2.enableISR(CHANNEL_A);
   time = millis();
+  displayTime = millis();
+  readerTime = millis();
 }
 
 ISR(TIMER2_A)
 {
-  if ((millis() - time) > 50) {
+  Serial.println(digitalRead(M_DIGITAL_READER));
+  //Reader
+  if ((millis() - readerTime) > 100) {
+    currentReaderValue = digitalRead(M_DIGITAL_READER);
+
+    if (currentReaderValue == 1 && previousReaderValue == 0) {
+      if (direction == true) {
+        passedHoles -= 1;
+      } else {
+        passedHoles += 1;
+      }
+
+      Serial.println(passedHoles);
+    }
+
+    previousReaderValue = digitalRead(M_DIGITAL_READER);
+    readerTime = millis();
+  }
+
+  if ((millis() - time) > 200) {
     pressedButtonCode = getPressedButtonCode(analogRead(B_ANALOG_READER));
 
     //on click
@@ -297,25 +398,26 @@ ISR(TIMER2_A)
     if (previouslyPressedButtonCode == -1 && pressedButtonCode != -1) {
       buttonPressedAt = millis();
 
-      /*
-        Switching between winows
-      */
       switch (pressedButtonCode)
       {
       case BUTTON_BACK_C:
+        previousWindow = currentWindow;
         currentWindow = currentWindow->onBack();
         break;
       
       case BUTTON_SELECT_C:
-        currentWindow = currentWindow->onSelect();
+        previousWindow = currentWindow;
+        currentWindow = currentWindow->onSelect(passedHoles, CLICK);
         break;
 
       case BUTTON_LEFT_C:
-        currentWindow = currentWindow->onLeft();
+        previousWindow = currentWindow;
+        currentWindow = currentWindow->onLeft(direction, CLICK);
         break;
 
       case BUTTON_RIGHT_C:
-        currentWindow = currentWindow->onRight();
+        previousWindow = currentWindow;
+        currentWindow = currentWindow->onRight(direction, CLICK);
         break;
       
       default:
@@ -328,7 +430,31 @@ ISR(TIMER2_A)
     if (previouslyPressedButtonCode != -1 && pressedButtonCode == -1) {
       buttonPressingTime = millis() - buttonPressedAt;
 
-      Serial.println(currentWindow->number);
+      switch (pressedButtonCode)
+      {
+      case BUTTON_BACK_C:
+        previousWindow = currentWindow;
+        currentWindow = currentWindow->onBack();
+        break;
+      
+      case BUTTON_SELECT_C:
+        previousWindow = currentWindow;
+        currentWindow = currentWindow->onSelect(passedHoles, RELEASE);
+        break;
+
+      case BUTTON_LEFT_C:
+        previousWindow = currentWindow;
+        currentWindow = currentWindow->onLeft(direction, RELEASE);
+        break;
+
+      case BUTTON_RIGHT_C:
+        previousWindow = currentWindow;
+        currentWindow = currentWindow->onRight(direction, RELEASE);
+        break;
+      
+      default:
+        break;
+      }
     }
 
     previouslyPressedButtonCode = getPressedButtonCode(analogRead(B_ANALOG_READER));
@@ -336,10 +462,23 @@ ISR(TIMER2_A)
 }
 
 void loop() {
+  //Keyboard
   if (isKeyboardDebugEnabled != true) {
-    
+    if (previousWindow != currentWindow) {
+      previousWindow = currentWindow;
+      Serial.println(currentWindow->title);
+    }
   } else {
     //put some debug here
     keyboardDebugging(B_ANALOG_READER, false);
+  }
+
+  if (millis() - displayTime > 1000/10) {
+    u8g.firstPage();
+    do {
+      currentWindow->draw();
+    } while ( u8g.nextPage() );
+
+    displayTime = millis();
   }
 }
