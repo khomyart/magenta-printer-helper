@@ -1,8 +1,14 @@
 #include <U8glib.h>
+#include <AccelStepper.h>
 
 //buttons states
 #define CLICK    0
 #define RELEASE  1
+
+//Step motor
+#define STEP 4
+#define DIR  5
+#define EN   6
 
 //Entities declaration
 class MenuWindow {
@@ -69,7 +75,8 @@ class MenuWindow {
       }
     }
 
-    virtual MenuWindow* onSelect(volatile int &passedHoles, int mode){
+    virtual MenuWindow* onSelect(int mode){
+    // virtual MenuWindow* onSelect(volatile int &passedHoles, int mode){
       if (mode == CLICK) {
         if (this->lowerLevelMenu != nullptr) {
           return this->lowerLevelMenu;
@@ -163,10 +170,13 @@ class TemplatesMenu : public MenuWindow {
 
 class CalibrationWindow : public MenuWindow {
   public:
+    AccelStepper* stepper;
+
     CalibrationWindow(
       char* title,
       int number, 
       U8GLIB_SH1106_128X64* u8g,
+      AccelStepper* stepper,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
@@ -174,13 +184,16 @@ class CalibrationWindow : public MenuWindow {
     : 
     MenuWindow(
       title, number, u8g, higherLevelMenu, lowerLevelMenu,
-      prevMenu, nextMenu) {}
+      prevMenu, nextMenu) {
+        this->stepper = stepper;
+      }
 
     void CalibrationWindow::draw(volatile int &passedHoles, double mmPerHole);
-    CalibrationWindow* CalibrationWindow::onSelect(volatile int &passedHoles, int mode);
-
-    CalibrationWindow* onLeft(bool &direction, int mode);
-    CalibrationWindow* onRight(bool &direction, int mode);
+    
+    CalibrationWindow* CalibrationWindow::onSelect(int mode);
+    // CalibrationWindow* CalibrationWindow::onSelect(volatile int &passedHoles, int mode);
+    CalibrationWindow* CalibrationWindow::onLeft(bool &direction, int mode);
+    CalibrationWindow* CalibrationWindow::onRight(bool &direction, int mode);
 };
 
 class CalibrationMenu : public MenuWindow {

@@ -1,5 +1,6 @@
 #include <U8glib.h>
 #include <GyverTimers.h>
+#include <AccelStepper.h>
 
 #include "AnalogKeyboard.h"
 
@@ -34,6 +35,10 @@
 // A4 - SDA, A5 - SCK
 U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_NONE);
 
+//Step motor
+#define STEP 4
+#define DIR  5
+
 unsigned long time;
 unsigned long displayTime;
 unsigned long readerTime;
@@ -62,7 +67,7 @@ bool currentReaderValue = 0;
 volatile int passedHoles = 0; // value of passed holes by detector
 int amountOfHolesOnWheel = 10;
 int degreeToGetOneMilimeter = 250;
-double mmPerHole = 3;
+double mmPerHole = 0;
 bool direction = UP;
 
 int keyboardDebugging(int analogButtonsReaderPortNumber, bool isMapingEnabled = false)
@@ -156,6 +161,10 @@ double getMMperHole(int amountOfHolesOnWheel, double degreeToGetOneMilimeter)
   return mmPerHole;
 }
 
+//Stepper
+//mode, pul, dir
+AccelStepper stepper(1, STEP, DIR);
+
 // Menu windows logic declaration
 MainMenu *mainMenu = new MainMenu("Main menu", 0, &u8g);
 
@@ -166,7 +175,7 @@ SemiAutomaticModeMenu *semiAutoModeMenu = new SemiAutomaticModeMenu("Semi-auto c
 TemplatesMenu *templatesMenu = new TemplatesMenu("Templates", 2, &u8g);
 
 CalibrationMenu *calibrationMenu = new CalibrationMenu("Calibration", 3, &u8g);
-CalibrationWindow *calibrationWindow = new CalibrationWindow("Calibration 123", 31, &u8g);
+CalibrationWindow *calibrationWindow = new CalibrationWindow("Calibration 123", 31, &u8g, &stepper);
 
 // Current window holder
 MenuWindow *previousWindow;
@@ -174,6 +183,7 @@ MenuWindow *currentWindow;
 
 void setup()
 {
+  mmPerHole = getMMperHole(amountOfHolesOnWheel, degreeToGetOneMilimeter);
   // Measurement ruler init
   pinMode(M_DIGITAL_READER, INPUT);
   previousReaderValue = digitalRead(M_DIGITAL_READER);
@@ -194,6 +204,11 @@ void setup()
   currentWindow = mainMenu;
   previousWindow = mainMenu;
 
+  //Stepper init
+  // unsigned long stepperTime;
+  stepper.setMaxSpeed(1000);
+  stepper.setSpeed(200); 
+  
   clearDisplay();
   Serial.begin(9600);
   Timer2.setFrequency(1);
@@ -206,24 +221,19 @@ void setup()
 ISR(TIMER2_A)
 {
   // Reader
-  if ((millis() - readerTime) > 10)
+  currentReaderValue = digitalRead(M_DIGITAL_READER);
+  if (currentReaderValue == 1 && previousReaderValue == 0)
   {
-    currentReaderValue = digitalRead(M_DIGITAL_READER);
-
-    if (currentReaderValue == 1 && previousReaderValue == 0)
+    if (direction == DOWN)
     {
-      if (direction == DOWN)
-      {
-        passedHoles -= 1;
-      }
-      else
-      {
-        passedHoles += 1;
-      }
+      passedHoles -= 1;
     }
-
-    previousReaderValue = digitalRead(M_DIGITAL_READER);
+    else
+    {
+      passedHoles += 1;
+    }
   }
+  previousReaderValue = digitalRead(M_DIGITAL_READER);
 
   if ((millis() - time) > 200)
   {
@@ -244,7 +254,8 @@ ISR(TIMER2_A)
 
       case BUTTON_SELECT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onSelect(passedHoles, CLICK);
+        // currentWindow = currentWindow->onSelect(passedHoles, CLICK);
+        currentWindow = currentWindow->onSelect(CLICK);
         break;
 
       case BUTTON_LEFT_C:
@@ -277,7 +288,8 @@ ISR(TIMER2_A)
 
       case BUTTON_SELECT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onSelect(passedHoles, RELEASE);
+        // currentWindow = currentWindow->onSelect(passedHoles, RELEASE);
+        currentWindow = currentWindow->onSelect(RELEASE);
         break;
 
       case BUTTON_LEFT_C:
@@ -301,6 +313,8 @@ ISR(TIMER2_A)
 
 void loop()
 {
+  stepper.runSpeed();
+  
   // Keyboard
   if (isKeyboardDebugEnabled != true)
   {
