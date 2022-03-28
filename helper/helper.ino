@@ -10,10 +10,10 @@
 // measuremenet digital reader
 #define M_DIGITAL_READER 3
 
-#define BUTTONS_VALUES_WINDOW 20
+#define BUTTONS_VALUES_WINDOW 35
 
 // buttons analog values
-#define BUTTON_BACK 1023
+#define BUTTON_BACK 1010
 #define BUTTON_SELECT 715
 #define BUTTON_LEFT 466
 #define BUTTON_RIGHT 238
@@ -23,10 +23,6 @@
 #define BUTTON_SELECT_C 2
 #define BUTTON_LEFT_C 3
 #define BUTTON_RIGHT_C 4
-
-// digital reader states
-#define UP 1
-#define DOWN 0
 
 // consts for map function, which translates default analog
 // signal (0 - 1023) to needed interval
@@ -69,6 +65,14 @@ int amountOfHolesOnWheel = 10;
 int degreeToGetOneMilimeter = 250;
 double mmPerHole = 0;
 bool direction = UP;
+
+//Stepper
+volatile bool 
+  isStepperRunning = false,
+  isStepperStopped = false;
+int 
+  stepperSpeed = 200,
+  stepperAcceleration = 50;
 
 int keyboardDebugging(int analogButtonsReaderPortNumber, bool isMapingEnabled = false)
 {
@@ -207,7 +211,10 @@ void setup()
   //Stepper init
   // unsigned long stepperTime;
   stepper.setMaxSpeed(1000);
-  stepper.setSpeed(200); 
+  stepper.setSpeed(0);
+  stepper.runSpeed();
+  stepper.stop();
+  // stepper.stop();
   
   clearDisplay();
   Serial.begin(9600);
@@ -220,6 +227,31 @@ void setup()
 
 ISR(TIMER2_A)
 {
+  //Stepper
+  if (isStepperRunning == true) {
+    switch (direction)
+    {
+    case UP:
+      stepper.setSpeed(-1 * stepperSpeed);
+      break;
+    
+    case DOWN:
+      stepper.setSpeed(stepperSpeed);
+      break;
+    }
+
+    stepper.runSpeed();
+  } else if(isStepperStopped == true) {
+    stepper.setSpeed(0);
+    stepper.runSpeed();
+    stepper.stop();
+    digitalWrite(STEP, 1);
+    digitalWrite(DIR, 1);
+    
+    isStepperRunning = false;
+    isStepperStopped = false;
+  }
+
   // Reader
   currentReaderValue = digitalRead(M_DIGITAL_READER);
   if (currentReaderValue == 1 && previousReaderValue == 0)
@@ -235,6 +267,7 @@ ISR(TIMER2_A)
   }
   previousReaderValue = digitalRead(M_DIGITAL_READER);
 
+  //Keyboard
   if ((millis() - time) > 200)
   {
     pressedButtonCode = getPressedButtonCode(analogRead(B_ANALOG_READER));
@@ -249,23 +282,22 @@ ISR(TIMER2_A)
       {
       case BUTTON_BACK_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onBack();
+        currentWindow = currentWindow->onBack(isStepperStopped);
         break;
 
       case BUTTON_SELECT_C:
         previousWindow = currentWindow;
-        // currentWindow = currentWindow->onSelect(passedHoles, CLICK);
-        currentWindow = currentWindow->onSelect(CLICK);
+        currentWindow = currentWindow->onSelect(passedHoles, isStepperRunning, isStepperStopped, CLICK);
         break;
 
       case BUTTON_LEFT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onLeft(direction, CLICK);
+        currentWindow = currentWindow->onLeft(direction, isStepperRunning, isStepperStopped, CLICK);
         break;
 
       case BUTTON_RIGHT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onRight(direction, CLICK);
+        currentWindow = currentWindow->onRight(direction, isStepperRunning, isStepperStopped, CLICK);
         break;
 
       default:
@@ -279,27 +311,26 @@ ISR(TIMER2_A)
     {
       buttonPressingTime = millis() - buttonPressedAt;
 
-      switch (pressedButtonCode)
+      switch (previouslyPressedButtonCode)
       {
       case BUTTON_BACK_C:
-        previousWindow = currentWindow;
-        currentWindow = currentWindow->onBack();
+        // previousWindow = currentWindow;
+        // currentWindow = currentWindow->onBack(isStepperStopped);
         break;
 
       case BUTTON_SELECT_C:
         previousWindow = currentWindow;
-        // currentWindow = currentWindow->onSelect(passedHoles, RELEASE);
-        currentWindow = currentWindow->onSelect(RELEASE);
+        currentWindow = currentWindow->onSelect(passedHoles, isStepperRunning, isStepperStopped, RELEASE);
         break;
 
       case BUTTON_LEFT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onLeft(direction, RELEASE);
+        currentWindow = currentWindow->onLeft(direction, isStepperRunning, isStepperStopped, RELEASE);
         break;
 
       case BUTTON_RIGHT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onRight(direction, RELEASE);
+        currentWindow = currentWindow->onRight(direction, isStepperRunning, isStepperStopped, RELEASE);
         break;
 
       default:
@@ -312,9 +343,7 @@ ISR(TIMER2_A)
 }
 
 void loop()
-{
-  stepper.runSpeed();
-  
+{  
   // Keyboard
   if (isKeyboardDebugEnabled != true)
   {

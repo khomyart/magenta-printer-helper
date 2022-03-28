@@ -10,6 +10,10 @@
 #define DIR  5
 #define EN   6
 
+// digital reader states
+#define UP 1
+#define DOWN 0
+
 //Entities declaration
 class MenuWindow {
   public:
@@ -67,7 +71,7 @@ class MenuWindow {
       this->u8g->print(this->title);
     }
 
-    MenuWindow* onBack() {
+    virtual MenuWindow* onBack(volatile bool &isStepperStopped) {
       if (this->higherLevelMenu != nullptr) {
         return this->higherLevelMenu;
       } else {
@@ -75,8 +79,7 @@ class MenuWindow {
       }
     }
 
-    virtual MenuWindow* onSelect(int mode){
-    // virtual MenuWindow* onSelect(volatile int &passedHoles, int mode){
+    virtual MenuWindow* onSelect(volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode){
       if (mode == CLICK) {
         if (this->lowerLevelMenu != nullptr) {
           return this->lowerLevelMenu;
@@ -90,7 +93,7 @@ class MenuWindow {
       }
       
     };
-    MenuWindow* onLeft(bool &direction, int mode) {
+    virtual MenuWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
       if (mode == CLICK) {
         if (this->prevMenu != nullptr) {
           return this->prevMenu;
@@ -104,7 +107,7 @@ class MenuWindow {
       }
       
     };
-    MenuWindow* onRight(bool &direction, int mode) {
+    virtual MenuWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
       if (mode == CLICK) {
         if (this->nextMenu != nullptr) {
           return this->nextMenu;
@@ -190,10 +193,9 @@ class CalibrationWindow : public MenuWindow {
 
     void CalibrationWindow::draw(volatile int &passedHoles, double mmPerHole);
     
-    CalibrationWindow* CalibrationWindow::onSelect(int mode);
-    // CalibrationWindow* CalibrationWindow::onSelect(volatile int &passedHoles, int mode);
-    CalibrationWindow* CalibrationWindow::onLeft(bool &direction, int mode);
-    CalibrationWindow* CalibrationWindow::onRight(bool &direction, int mode);
+    CalibrationWindow* CalibrationWindow::onSelect(volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    CalibrationWindow* CalibrationWindow::onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    CalibrationWindow* CalibrationWindow::onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
 };
 
 class CalibrationMenu : public MenuWindow {
