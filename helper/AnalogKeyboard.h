@@ -62,6 +62,15 @@ class MenuWindow {
     }
 
     /**
+     * @brief needs to be fired when switching between windows
+     * 
+     * @return MenuWindow* 
+     */
+    virtual MenuWindow* init(void) {
+      return this;
+    }
+
+    /**
      * @brief Draws content on display
      * 
      */
@@ -74,45 +83,42 @@ class MenuWindow {
     virtual MenuWindow* onBack(volatile bool &isStepperStopped) {
       if (this->higherLevelMenu != nullptr) {
         return this->higherLevelMenu;
-      } else {
-        return this;
       }
+      
+      return this;
     }
 
-    virtual MenuWindow* onSelect(volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode){
+    virtual MenuWindow* onSelect(bool &direction, volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode){
       if (mode == CLICK) {
         if (this->lowerLevelMenu != nullptr) {
           return this->lowerLevelMenu;
-        } else {
-          return this;
         }
       }
 
       if (mode == RELEASE) {
 
       }
-      
+
+      return this;
     };
     virtual MenuWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
       if (mode == CLICK) {
         if (this->prevMenu != nullptr) {
           return this->prevMenu;
-        } else {
-          return this;
         }
       }
 
       if (mode == RELEASE) {
       
       }
+
+      return this;
       
     };
     virtual MenuWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
       if (mode == CLICK) {
         if (this->nextMenu != nullptr) {
           return this->nextMenu;
-        } else {
-          return this;
         }
       }
 
@@ -120,6 +126,7 @@ class MenuWindow {
 
       }
       
+      return this;
     };
 };
 
@@ -173,13 +180,10 @@ class TemplatesMenu : public MenuWindow {
 
 class CalibrationWindow : public MenuWindow {
   public:
-    AccelStepper* stepper;
-
     CalibrationWindow(
       char* title,
       int number, 
       U8GLIB_SH1106_128X64* u8g,
-      AccelStepper* stepper,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
@@ -187,15 +191,13 @@ class CalibrationWindow : public MenuWindow {
     : 
     MenuWindow(
       title, number, u8g, higherLevelMenu, lowerLevelMenu,
-      prevMenu, nextMenu) {
-        this->stepper = stepper;
-      }
+      prevMenu, nextMenu) {}
 
-    void CalibrationWindow::draw(volatile int &passedHoles, double mmPerHole);
+    void draw(volatile int &passedHoles, double mmPerHole);
     
-    CalibrationWindow* CalibrationWindow::onSelect(volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
-    CalibrationWindow* CalibrationWindow::onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
-    CalibrationWindow* CalibrationWindow::onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    CalibrationWindow* onSelect(bool &direction, volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    CalibrationWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    CalibrationWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
 };
 
 class CalibrationMenu : public MenuWindow {
@@ -231,6 +233,30 @@ class ManualModeMenu : public MenuWindow {
       prevMenu, nextMenu) {}
 };
 
+class ManualModeWindow : public MenuWindow {
+  public:
+      volatile int* passedHoles;
+      volatile int* targetPassedHoles;
+
+    ManualModeWindow(
+      char* title,
+      int number, 
+      U8GLIB_SH1106_128X64* u8g,
+      MenuWindow* higherLevelMenu = nullptr,
+      MenuWindow* lowerLevelMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
+      MenuWindow* nextMenu = nullptr) 
+    : 
+    MenuWindow(
+      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      prevMenu, nextMenu) {}
+    
+    void draw(volatile int& passedHoles, double mmPerHole);
+
+    ManualModeWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    ManualModeWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+};
+
 class SemiAutomaticModeMenu : public MenuWindow {
   public:
     SemiAutomaticModeMenu(
@@ -246,4 +272,37 @@ class SemiAutomaticModeMenu : public MenuWindow {
       title, number, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
+
+class SemiAutomaticModeWindow : public MenuWindow {
+  public:
+      volatile int* passedHoles;
+      volatile int* targetPassedHoles;
+
+    SemiAutomaticModeWindow(
+      char* title,
+      int number, 
+      U8GLIB_SH1106_128X64* u8g,
+      volatile int *passedHoles,
+      volatile int *targetPassedHoles,
+      MenuWindow* higherLevelMenu = nullptr,
+      MenuWindow* lowerLevelMenu = nullptr,
+      MenuWindow* prevMenu = nullptr,
+      MenuWindow* nextMenu = nullptr) 
+    : 
+    MenuWindow(
+      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      prevMenu, nextMenu) {
+        this->passedHoles = passedHoles;
+        this->targetPassedHoles = targetPassedHoles;
+      }
+
+    SemiAutomaticModeWindow* init(void);
+    
+    void draw(volatile int& passedHoles, double mmPerHole);
+
+    SemiAutomaticModeWindow* onSelect(bool &direction, volatile int& passedHoles, volatile bool& isStepperRunning, volatile bool& isStepperStopped, int mode);
+    SemiAutomaticModeWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    SemiAutomaticModeWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+};
+
 

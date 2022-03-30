@@ -45,7 +45,7 @@ bool isKeyboardDebugEnabled = false;
 volatile unsigned long buttonPressedAt;
 // how long is button pressed
 volatile unsigned long buttonPressingTime;
-//-1 - means buttons are not pressed at all
+// -1 - means buttons are not pressed at all
 // When we have value transition from previouslyPressedButtonCode = -1 to
 // pressedButtonCode = (4,6,etc) we can be sure what a button was pressed.
 // When we have value transition from previouslyPressedButtonCode = (4,6,etc) to
@@ -61,6 +61,7 @@ volatile int
 bool previousReaderValue = 0;
 bool currentReaderValue = 0;
 volatile int passedHoles = 0; // value of passed holes by detector
+volatile int targetPassedHoles = 0; // value of passed holes by detector
 int amountOfHolesOnWheel = 10;
 int degreeToGetOneMilimeter = 250;
 double mmPerHole = 0;
@@ -174,12 +175,14 @@ MainMenu *mainMenu = new MainMenu("Main menu", 0, &u8g);
 
 EngineControllerMenu *engineControllerMenu = new EngineControllerMenu("Engine control", 1, &u8g);
 ManualModeMenu *manualModeMenu = new ManualModeMenu("Manual control", 11, &u8g);
+// ManualModeWindow *manualModeWindow = new ManualModeWindow("Manual control window", 111, &u8g);
 SemiAutomaticModeMenu *semiAutoModeMenu = new SemiAutomaticModeMenu("Semi-auto control", 12, &u8g);
+SemiAutomaticModeWindow *semiAutoModeWindow = new SemiAutomaticModeWindow("Semi-auto control window", 121, &u8g, &passedHoles, &targetPassedHoles);
 
 TemplatesMenu *templatesMenu = new TemplatesMenu("Templates", 2, &u8g);
 
 CalibrationMenu *calibrationMenu = new CalibrationMenu("Calibration", 3, &u8g);
-CalibrationWindow *calibrationWindow = new CalibrationWindow("Calibration 123", 31, &u8g, &stepper);
+CalibrationWindow *calibrationWindow = new CalibrationWindow("Calibration window", 31, &u8g);
 
 // Current window holder
 MenuWindow *previousWindow;
@@ -198,7 +201,9 @@ void setup()
 
   engineControllerMenu->setPullOfWindows(mainMenu, manualModeMenu, calibrationMenu, templatesMenu);
   manualModeMenu->setPullOfWindows(engineControllerMenu, nullptr, semiAutoModeMenu, semiAutoModeMenu);
-  semiAutoModeMenu->setPullOfWindows(engineControllerMenu, nullptr, manualModeMenu, manualModeMenu);
+  manualModeWindow->setPullOfWindows(manualModeMenu, nullptr, nullptr, nullptr);
+  semiAutoModeMenu->setPullOfWindows(engineControllerMenu, semiAutoModeWindow, manualModeMenu, manualModeMenu);
+  semiAutoModeWindow->setPullOfWindows(semiAutoModeMenu, nullptr, nullptr, nullptr);
 
   templatesMenu->setPullOfWindows(mainMenu, nullptr, engineControllerMenu, calibrationMenu);
 
@@ -228,7 +233,21 @@ void setup()
 ISR(TIMER2_A)
 {
   //Stepper
-  if (isStepperRunning == true) {
+  if(isStepperStopped == true 
+      || (currentWindow->number == 121 && 
+          targetPassedHoles == passedHoles) 
+      || (currentWindow->number == 111 &&
+          passedHoles <= 0 && direction == DOWN)
+    ) {
+    stepper.setSpeed(0);
+    stepper.runSpeed();
+    stepper.stop();
+    
+    isStepperRunning = false;
+    isStepperStopped = false;
+  }
+
+  if (isStepperRunning == true) {   
     switch (direction)
     {
     case UP:
@@ -241,15 +260,6 @@ ISR(TIMER2_A)
     }
 
     stepper.runSpeed();
-  } else if(isStepperStopped == true) {
-    stepper.setSpeed(0);
-    stepper.runSpeed();
-    stepper.stop();
-    digitalWrite(STEP, 1);
-    digitalWrite(DIR, 1);
-    
-    isStepperRunning = false;
-    isStepperStopped = false;
   }
 
   // Reader
@@ -268,7 +278,7 @@ ISR(TIMER2_A)
   previousReaderValue = digitalRead(M_DIGITAL_READER);
 
   //Keyboard
-  if ((millis() - time) > 200)
+  if ((millis() - time) > 400)
   {
     pressedButtonCode = getPressedButtonCode(analogRead(B_ANALOG_READER));
 
@@ -287,7 +297,7 @@ ISR(TIMER2_A)
 
       case BUTTON_SELECT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onSelect(passedHoles, isStepperRunning, isStepperStopped, CLICK);
+        currentWindow = currentWindow->onSelect(direction, passedHoles, isStepperRunning, isStepperStopped, CLICK);
         break;
 
       case BUTTON_LEFT_C:
@@ -320,7 +330,7 @@ ISR(TIMER2_A)
 
       case BUTTON_SELECT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onSelect(passedHoles, isStepperRunning, isStepperStopped, RELEASE);
+        currentWindow = currentWindow->onSelect(direction, passedHoles, isStepperRunning, isStepperStopped, RELEASE);
         break;
 
       case BUTTON_LEFT_C:
@@ -349,6 +359,10 @@ void loop()
   {
     if (previousWindow != currentWindow)
     {
+      Serial.println("Prev:");
+      Serial.println(previousWindow->title);
+      Serial.println("Curr:");
+      Serial.println(currentWindow->init()->title);
       previousWindow = currentWindow;
     }
   }
