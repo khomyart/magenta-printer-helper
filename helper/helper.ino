@@ -43,6 +43,8 @@ unsigned long readerTime;
 bool isKeyboardDebugEnabled = false;
 // time, when button was pressed
 volatile unsigned long buttonPressedAt;
+// time, when button was pressed
+volatile unsigned long buttonReleasedAt;
 // how long is button pressed
 volatile unsigned long buttonPressingTime;
 // -1 - means buttons are not pressed at all
@@ -172,14 +174,18 @@ AccelStepper stepper(1, STEP, DIR);
 
 // Menu windows logic declaration
 MainMenu *mainMenu = new MainMenu("Main menu", 0, &u8g);
+ScreenSaver *screenSaver = new ScreenSaver("Screen saver", -1, &u8g);
 
 EngineControllerMenu *engineControllerMenu = new EngineControllerMenu("Engine control", 1, &u8g);
 ManualModeMenu *manualModeMenu = new ManualModeMenu("Manual control", 11, &u8g);
-// ManualModeWindow *manualModeWindow = new ManualModeWindow("Manual control window", 111, &u8g);
+ManualModeWindow *manualModeWindow = new ManualModeWindow("Manual control window", 111, &u8g);
 SemiAutomaticModeMenu *semiAutoModeMenu = new SemiAutomaticModeMenu("Semi-auto control", 12, &u8g);
 SemiAutomaticModeWindow *semiAutoModeWindow = new SemiAutomaticModeWindow("Semi-auto control window", 121, &u8g, &passedHoles, &targetPassedHoles);
 
 TemplatesMenu *templatesMenu = new TemplatesMenu("Templates", 2, &u8g);
+TShirtTemplate *tShirtTemplate = new TShirtTemplate("T - shirt", 21, 20, &passedHoles, &targetPassedHoles, &u8g);
+SweaterTemplate *sweaterTemplate = new SweaterTemplate("Sweater", 22, 30, &passedHoles, &targetPassedHoles, &u8g);
+HoodyTemplate *hoodyTemplate = new HoodyTemplate("Hoody", 23, 40, &passedHoles, &targetPassedHoles, &u8g);
 
 CalibrationMenu *calibrationMenu = new CalibrationMenu("Calibration", 3, &u8g);
 CalibrationWindow *calibrationWindow = new CalibrationWindow("Calibration window", 31, &u8g);
@@ -197,15 +203,19 @@ void setup()
   currentReaderValue = digitalRead(M_DIGITAL_READER);
 
   // Menu windows init
-  mainMenu->setPullOfWindows(engineControllerMenu, engineControllerMenu, engineControllerMenu, engineControllerMenu);
+  mainMenu->setPullOfWindows(engineControllerMenu, screenSaver, engineControllerMenu, engineControllerMenu);
+  screenSaver->setPullOfWindows(engineControllerMenu, engineControllerMenu, engineControllerMenu, engineControllerMenu);
 
   engineControllerMenu->setPullOfWindows(mainMenu, manualModeMenu, calibrationMenu, templatesMenu);
-  manualModeMenu->setPullOfWindows(engineControllerMenu, nullptr, semiAutoModeMenu, semiAutoModeMenu);
+  manualModeMenu->setPullOfWindows(engineControllerMenu, manualModeWindow, semiAutoModeMenu, semiAutoModeMenu);
   manualModeWindow->setPullOfWindows(manualModeMenu, nullptr, nullptr, nullptr);
   semiAutoModeMenu->setPullOfWindows(engineControllerMenu, semiAutoModeWindow, manualModeMenu, manualModeMenu);
   semiAutoModeWindow->setPullOfWindows(semiAutoModeMenu, nullptr, nullptr, nullptr);
 
-  templatesMenu->setPullOfWindows(mainMenu, nullptr, engineControllerMenu, calibrationMenu);
+  templatesMenu->setPullOfWindows(mainMenu, tShirtTemplate, engineControllerMenu, calibrationMenu);
+  tShirtTemplate->setPullOfWindows(templatesMenu, nullptr, hoodyTemplate, sweaterTemplate);
+  sweaterTemplate->setPullOfWindows(templatesMenu, nullptr, tShirtTemplate, hoodyTemplate);
+  hoodyTemplate->setPullOfWindows(templatesMenu, nullptr, sweaterTemplate, tShirtTemplate);
 
   calibrationMenu->setPullOfWindows(mainMenu, calibrationWindow, templatesMenu, engineControllerMenu);
   calibrationWindow->setPullOfWindows(calibrationMenu, nullptr, nullptr, nullptr);
@@ -216,10 +226,6 @@ void setup()
   //Stepper init
   // unsigned long stepperTime;
   stepper.setMaxSpeed(1000);
-  stepper.setSpeed(0);
-  stepper.runSpeed();
-  stepper.stop();
-  // stepper.stop();
   
   clearDisplay();
   Serial.begin(9600);
@@ -238,6 +244,9 @@ ISR(TIMER2_A)
           targetPassedHoles == passedHoles) 
       || (currentWindow->number == 111 &&
           passedHoles <= 0 && direction == DOWN)
+          //all templates
+      || ((currentWindow->number > 20 && currentWindow->number < 30) && 
+          targetPassedHoles == passedHoles)
     ) {
     stepper.setSpeed(0);
     stepper.runSpeed();
@@ -319,7 +328,8 @@ ISR(TIMER2_A)
     // buttonPressingTime, previouslyPressedButtonCode
     if (previouslyPressedButtonCode != -1 && pressedButtonCode == -1)
     {
-      buttonPressingTime = millis() - buttonPressedAt;
+      buttonReleasedAt = millis();
+      buttonPressingTime = buttonReleasedAt - buttonPressedAt;
 
       switch (previouslyPressedButtonCode)
       {
@@ -359,10 +369,7 @@ void loop()
   {
     if (previousWindow != currentWindow)
     {
-      Serial.println("Prev:");
-      Serial.println(previousWindow->title);
-      Serial.println("Curr:");
-      Serial.println(currentWindow->init()->title);
+      currentWindow->init();
       previousWindow = currentWindow;
     }
   }
@@ -382,4 +389,10 @@ void loop()
 
     displayTime = millis();
   }
+
+  // if (millis() - buttonReleasedAt > 10000 && currentWindow->number != -1) {
+  //   // screenSaver->setPullOfWindows(currentWindow, currentWindow, currentWindow, currentWindow);
+  //   previousWindow = currentWindow;
+  //   currentWindow = screenSaver;
+  // }
 }
