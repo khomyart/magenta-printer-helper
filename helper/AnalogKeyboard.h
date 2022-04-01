@@ -166,8 +166,8 @@ class ScreenSaver : public MenuWindow {
       prevMenu, nextMenu) {}
     
     void draw(volatile int&, double);
-
-    ScreenSaver* ScreenSaver::init(volatile bool&);
+    
+    ScreenSaver* ScreenSaver::init(volatile bool&)
 };
 
 class EngineControllerMenu : public MenuWindow {

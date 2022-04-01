@@ -54,14 +54,14 @@ volatile unsigned long buttonPressingTime;
 // pressedButtonCode = -1 we can be sure what a button was released
 volatile int previouslyPressedButtonCode = -1;
 volatile int pressedButtonCode = -1;
-
-int screenFadingTime = 1; //minutes
+volatile unsigned long buttonHoldingTriggeredAt;
 
 volatile int
     currentWindowNumber = 0,
     selectedWindowNumber = 0;
 
 //Screen 
+int screenFadingTime = 1; //minutes
 volatile bool isRenderAllowed = true;
 volatile bool showScreenSaver = false;
 
@@ -240,6 +240,7 @@ void setup()
   time = millis();
   displayTime = millis();
   readerTime = millis();
+  buttonHoldingTriggeredAt = millis();
 }
 
 ISR(TIMER2_A)
@@ -324,7 +325,7 @@ ISR(TIMER2_A)
       default:
         break;
       }
-    }
+    } 
 
     // on release
     // buttonPressingTime, previouslyPressedButtonCode
@@ -332,6 +333,11 @@ ISR(TIMER2_A)
     {
       buttonReleasedAt = millis();
       buttonPressingTime = buttonReleasedAt - buttonPressedAt;
+      //makes those variables = 0, becouse we need to reset their values for proper
+      //tracking of button holding
+      // buttonPressedAt = 0;
+      // buttonReleasedAt = 0;
+      // buttonPressingTime = 0;
 
       switch (previouslyPressedButtonCode)
       {
@@ -378,26 +384,47 @@ void loop()
   }
 
   // Show screen saver trigger
-  if (millis() - buttonPressedAt > 10000 && showScreenSaver == false) {
+  if (millis() - buttonReleasedAt > 10000 && 
+      showScreenSaver == false && 
+      buttonReleasedAt > buttonPressedAt) {
     showScreenSaver = true;
+  }
+
+  //buttonReleasedAt < buttonPressedAt means what button has been pressed
+  //millis() - buttonPressedAt > 1000 pressed more than 1000 in this case
+  if (millis() - buttonPressedAt > 1000 && buttonReleasedAt <= buttonPressedAt) {
+    if (millis() - buttonHoldingTriggeredAt > 50) {
+      //Semi auto window button holding
+      if (currentWindow->number == 121) {
+        if (pressedButtonCode == BUTTON_LEFT_C) {
+          if (targetPassedHoles - 1 < 0) {
+            targetPassedHoles = 0;
+          } else {
+            targetPassedHoles -= 1;
+          }
+        }
+        if (pressedButtonCode == BUTTON_RIGHT_C) {
+          targetPassedHoles += 1;
+        }
+      }
+      buttonHoldingTriggeredAt = millis();
+    }
   }
 
   // Shows screen saver
   if (showScreenSaver == true && isRenderAllowed == true) {
-    Serial.println("going sleeps");
     screenSaver->setPullOfWindows(currentWindow, currentWindow, currentWindow, currentWindow);
     currentWindow = screenSaver;
     u8g.firstPage();
     do
     {
-      Serial.println("sleepy renda");
       currentWindow->draw(passedHoles, mmPerHole);
     } while (u8g.nextPage());
     previouslyPressedButtonCode = -1;
     pressedButtonCode = 0;
   }
 
-  // 
+  //Track window changing 
   if (previousWindow->number != currentWindow->number) {
     if (currentWindow->number != -1) {
       showScreenSaver = false;
@@ -411,7 +438,6 @@ void loop()
       u8g.firstPage();
       do
       {
-        Serial.println("regular renda");
         currentWindow->draw(passedHoles, mmPerHole);
       } while (u8g.nextPage());
 

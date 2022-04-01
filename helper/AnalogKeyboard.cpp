@@ -153,7 +153,7 @@ SemiAutomaticModeWindow* SemiAutomaticModeWindow::onRight(bool &direction, volat
 };
 
 //Manual engine control
-void ManualModeWindow::draw(volatile int &passedHoles, double mmPerHole)  {
+void ManualModeWindow::draw(volatile int &passedHoles, double mmPerHole) {
     int 
         initNumberLength = 0,
         numberFontSize = 6;
