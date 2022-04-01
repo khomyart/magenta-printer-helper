@@ -66,7 +66,11 @@ class MenuWindow {
      * 
      * @return MenuWindow* 
      */
-    virtual MenuWindow* init(void) {
+    virtual MenuWindow* init(volatile bool &isRenderAllowed) {
+      if (isRenderAllowed == false) {
+        isRenderAllowed = true;
+      }
+
       return this;
     }
 
@@ -162,6 +166,8 @@ class ScreenSaver : public MenuWindow {
       prevMenu, nextMenu) {}
     
     void draw(volatile int&, double);
+
+    ScreenSaver* ScreenSaver::init(volatile bool&);
 };
 
 class EngineControllerMenu : public MenuWindow {
@@ -401,7 +407,7 @@ class SemiAutomaticModeWindow : public MenuWindow {
         this->targetPassedHoles = targetPassedHoles;
       }
 
-    SemiAutomaticModeWindow* init(void);
+    SemiAutomaticModeWindow* init(volatile bool &isRenderAllowed);
     
     void draw(volatile int& passedHoles, double mmPerHole);
 

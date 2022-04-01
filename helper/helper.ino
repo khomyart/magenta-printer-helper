@@ -55,9 +55,15 @@ volatile unsigned long buttonPressingTime;
 volatile int previouslyPressedButtonCode = -1;
 volatile int pressedButtonCode = -1;
 
+int screenFadingTime = 1; //minutes
+
 volatile int
     currentWindowNumber = 0,
     selectedWindowNumber = 0;
+
+//Screen 
+volatile bool isRenderAllowed = true;
+volatile bool showScreenSaver = false;
 
 // Position reader variables
 bool previousReaderValue = 0;
@@ -247,11 +253,7 @@ ISR(TIMER2_A)
           //all templates
       || ((currentWindow->number > 20 && currentWindow->number < 30) && 
           targetPassedHoles == passedHoles)
-    ) {
-    stepper.setSpeed(0);
-    stepper.runSpeed();
-    stepper.stop();
-    
+    ) {   
     isStepperRunning = false;
     isStepperStopped = false;
   }
@@ -318,7 +320,7 @@ ISR(TIMER2_A)
         previousWindow = currentWindow;
         currentWindow = currentWindow->onRight(direction, isStepperRunning, isStepperStopped, CLICK);
         break;
-
+      
       default:
         break;
       }
@@ -367,32 +369,53 @@ void loop()
   // Keyboard
   if (isKeyboardDebugEnabled != true)
   {
-    if (previousWindow != currentWindow)
-    {
-      currentWindow->init();
-      previousWindow = currentWindow;
-    }
+
   }
   else
   {
-    // put some debug here
+    // Put some debug here
     keyboardDebugging(B_ANALOG_READER, false);
   }
 
-  if (millis() - displayTime > 1000 / 10)
-  {
+  // Show screen saver trigger
+  if (millis() - buttonPressedAt > 10000 && showScreenSaver == false) {
+    showScreenSaver = true;
+  }
+
+  // Shows screen saver
+  if (showScreenSaver == true && isRenderAllowed == true) {
+    Serial.println("going sleeps");
+    screenSaver->setPullOfWindows(currentWindow, currentWindow, currentWindow, currentWindow);
+    currentWindow = screenSaver;
     u8g.firstPage();
     do
     {
+      Serial.println("sleepy renda");
       currentWindow->draw(passedHoles, mmPerHole);
     } while (u8g.nextPage());
-
-    displayTime = millis();
+    previouslyPressedButtonCode = -1;
+    pressedButtonCode = 0;
   }
 
-  // if (millis() - buttonReleasedAt > 10000 && currentWindow->number != -1) {
-  //   // screenSaver->setPullOfWindows(currentWindow, currentWindow, currentWindow, currentWindow);
-  //   previousWindow = currentWindow;
-  //   currentWindow = screenSaver;
-  // }
+  // 
+  if (previousWindow->number != currentWindow->number) {
+    if (currentWindow->number != -1) {
+      showScreenSaver = false;
+    }
+    currentWindow->init(isRenderAllowed);
+  }
+
+  //allow render with 10 fps and when current screen is not a screenSaver
+  if (isRenderAllowed == true) {
+    if ((millis() - displayTime) > 1000 / 10) {
+      u8g.firstPage();
+      do
+      {
+        Serial.println("regular renda");
+        currentWindow->draw(passedHoles, mmPerHole);
+      } while (u8g.nextPage());
+
+      displayTime = millis();
+    }
+  }
 }

@@ -1,9 +1,10 @@
 #include "AnalogKeyboard.h"
 
-void ScreenSaver::draw(volatile int &passedHoles, double mmPerHole)  {
-    this->u8g->setFont(u8g_font_helvR10);
-    this->u8g->setPrintPos(50, 10);
-    this->u8g->print(".");
+void ScreenSaver::draw(volatile int &passedHoles, double mmPerHole)  {}
+
+ScreenSaver* ScreenSaver::init(volatile bool &isRenderAllowed) {
+    isRenderAllowed = false;
+    return this;
 }
 
 void CalibrationWindow::draw(volatile int &passedHoles, double mmPerHole)  {
@@ -74,7 +75,7 @@ CalibrationWindow* CalibrationWindow::onRight(bool &direction, volatile bool &is
 };
 
 //Semi - auto engine control
-SemiAutomaticModeWindow* SemiAutomaticModeWindow::init(void) {
+SemiAutomaticModeWindow* SemiAutomaticModeWindow::init(volatile bool &isRenderAllowed) {
     if (*this->passedHoles < 0) {
         *this->targetPassedHoles = 0;
     } else {
