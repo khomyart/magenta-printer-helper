@@ -18,7 +18,7 @@
 class MenuWindow {
   public:
     char* title;
-    int number;
+    int index;
     U8GLIB_SH1106_128X64* u8g;
     MenuWindow* higherLevelMenu;
     MenuWindow* lowerLevelMenu;
@@ -27,14 +27,14 @@ class MenuWindow {
 
     MenuWindow(
       char* title, 
-      int number,
+      int index,
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
       MenuWindow* prevMenu = nullptr,
       MenuWindow* nextMenu = nullptr) {
         this->title = title;
-        this->number = number;
+        this->index = index;
         this->u8g = u8g;
         this->higherLevelMenu = higherLevelMenu;
         this->lowerLevelMenu = lowerLevelMenu;
@@ -85,6 +85,8 @@ class MenuWindow {
     }
 
     virtual MenuWindow* onBack(volatile bool &isStepperStopped) {
+      isStepperStopped = true;
+
       if (this->higherLevelMenu != nullptr) {
         return this->higherLevelMenu;
       }
@@ -138,7 +140,7 @@ class MainMenu : public MenuWindow {
   public:
     MainMenu(
       char* title,
-      int number,
+      int index,
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -146,7 +148,7 @@ class MainMenu : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
@@ -154,7 +156,7 @@ class ScreenSaver : public MenuWindow {
   public:
     ScreenSaver(
       char* title,
-      int number,
+      int index,
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -162,19 +164,19 @@ class ScreenSaver : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
     
     void draw(volatile int&, double);
     
-    ScreenSaver* ScreenSaver::init(volatile bool&)
+    ScreenSaver* ScreenSaver::init(volatile bool&);
 };
 
 class EngineControllerMenu : public MenuWindow {
   public:
     EngineControllerMenu(
       char* title,
-      int number,
+      int index,
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -182,7 +184,7 @@ class EngineControllerMenu : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
@@ -190,7 +192,7 @@ class TemplatesMenu : public MenuWindow {
   public:
     TemplatesMenu(
       char* title,
-      int number,
+      int index,
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -198,20 +200,21 @@ class TemplatesMenu : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
 class TemplateWindow : public MenuWindow {
   public:
-    int targetPassedHolesForCurrentTemplate;
+    double targetPosition;
     volatile int* targetPassedHoles;
     volatile int* passedHoles;
+    double mmPerHole;
 
     TemplateWindow(
       char* title,
-      int number,
-      int targetPassedHolesForCurrentTemplate, //amount of holes
+      int index,
+      double targetPosition, //mm
       volatile int* passedHoles,
       volatile int* targetPassedHoles,
       U8GLIB_SH1106_128X64* u8g,
@@ -221,13 +224,17 @@ class TemplateWindow : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {
-        this->targetPassedHolesForCurrentTemplate = targetPassedHolesForCurrentTemplate;
+        this->targetPosition = targetPosition;
         this->targetPassedHoles = targetPassedHoles;
         this->passedHoles = passedHoles;
       }
     
+    void setMMPerHole(double mmPerHole) {
+      this->mmPerHole = mmPerHole;
+    };
+
     void draw(volatile int &passedHoles, double mmPerHole);
     TemplateWindow* onSelect(bool &direction, volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
 };
@@ -236,8 +243,8 @@ class TShirtTemplate : public TemplateWindow {
   public:
     TShirtTemplate(
       char* title,
-      int number,
-      int targetPassedHolesForCurrentTemplate, //amount of holes
+      int index,
+      double targetPosition, //amount of holes
       volatile int* passedHoles,
       volatile int* targetPassedHoles,
       U8GLIB_SH1106_128X64* u8g,
@@ -247,7 +254,7 @@ class TShirtTemplate : public TemplateWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     TemplateWindow(
-      title, number, targetPassedHolesForCurrentTemplate, passedHoles, targetPassedHoles, u8g, higherLevelMenu, 
+      title, index, targetPosition, passedHoles, targetPassedHoles, u8g, higherLevelMenu, 
       lowerLevelMenu, prevMenu, nextMenu) {}
 };
 
@@ -255,8 +262,8 @@ class SweaterTemplate : public TemplateWindow {
   public:
     SweaterTemplate(
       char* title,
-      int number,
-      int targetPassedHolesForCurrentTemplate, //amount of holes
+      int index,
+      double targetPosition, //amount of holes
       volatile int* passedHoles,
       volatile int* targetPassedHoles,
       U8GLIB_SH1106_128X64* u8g,
@@ -266,7 +273,7 @@ class SweaterTemplate : public TemplateWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     TemplateWindow(
-      title, number, targetPassedHolesForCurrentTemplate, passedHoles, targetPassedHoles, u8g, higherLevelMenu, 
+      title, index, targetPosition, passedHoles, targetPassedHoles, u8g, higherLevelMenu, 
       lowerLevelMenu, prevMenu, nextMenu) {}
 };
 
@@ -274,8 +281,8 @@ class HoodyTemplate : public TemplateWindow {
   public:
     HoodyTemplate(
       char* title,
-      int number,
-      int targetPassedHolesForCurrentTemplate, //amount of holes
+      int index,
+      double targetPosition, //amount of holes
       volatile int* passedHoles,
       volatile int* targetPassedHoles,
       U8GLIB_SH1106_128X64* u8g,
@@ -285,7 +292,7 @@ class HoodyTemplate : public TemplateWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     TemplateWindow(
-      title, number, targetPassedHolesForCurrentTemplate, passedHoles, targetPassedHoles, u8g, higherLevelMenu, 
+      title, index, targetPosition, passedHoles, targetPassedHoles, u8g, higherLevelMenu, 
       lowerLevelMenu, prevMenu, nextMenu) {}
 };
 
@@ -293,7 +300,7 @@ class CalibrationWindow : public MenuWindow {
   public:
     CalibrationWindow(
       char* title,
-      int number, 
+      int index, 
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -301,7 +308,7 @@ class CalibrationWindow : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 
     void draw(volatile int &passedHoles, double mmPerHole);
@@ -315,7 +322,7 @@ class CalibrationMenu : public MenuWindow {
   public:
     CalibrationMenu(
       char* title,
-      int number, 
+      int index, 
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       CalibrationWindow* lowerLevelMenu = nullptr,
@@ -323,7 +330,7 @@ class CalibrationMenu : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
@@ -332,7 +339,7 @@ class ManualModeMenu : public MenuWindow {
   public:
     ManualModeMenu(
       char* title,
-      int number, 
+      int index, 
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -340,7 +347,7 @@ class ManualModeMenu : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
@@ -351,7 +358,7 @@ class ManualModeWindow : public MenuWindow {
 
     ManualModeWindow(
       char* title,
-      int number, 
+      int index, 
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -359,7 +366,7 @@ class ManualModeWindow : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
     
     void draw(volatile int& passedHoles, double mmPerHole);
@@ -372,7 +379,7 @@ class SemiAutomaticModeMenu : public MenuWindow {
   public:
     SemiAutomaticModeMenu(
       char* title,
-      int number, 
+      int index, 
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -380,7 +387,7 @@ class SemiAutomaticModeMenu : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
 };
 
@@ -391,7 +398,7 @@ class SemiAutomaticModeWindow : public MenuWindow {
 
     SemiAutomaticModeWindow(
       char* title,
-      int number, 
+      int index, 
       U8GLIB_SH1106_128X64* u8g,
       volatile int *passedHoles,
       volatile int *targetPassedHoles,
@@ -401,7 +408,7 @@ class SemiAutomaticModeWindow : public MenuWindow {
       MenuWindow* nextMenu = nullptr) 
     : 
     MenuWindow(
-      title, number, u8g, higherLevelMenu, lowerLevelMenu,
+      title, index, u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {
         this->passedHoles = passedHoles;
         this->targetPassedHoles = targetPassedHoles;

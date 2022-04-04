@@ -10,7 +10,7 @@
 // measuremenet digital reader
 #define M_DIGITAL_READER 3
 
-#define BUTTONS_VALUES_WINDOW 35
+#define BUTTONS_VALUES_WINDOW 100
 
 // buttons analog values
 #define BUTTON_BACK 1010
@@ -36,8 +36,8 @@ U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_NONE);
 #define DIR  5
 
 unsigned long time;
-unsigned long displayTime;
 unsigned long readerTime;
+unsigned long displayTime;
 
 // If keyboard needs calibration
 bool isKeyboardDebugEnabled = false;
@@ -57,8 +57,8 @@ volatile int pressedButtonCode = -1;
 volatile unsigned long buttonHoldingTriggeredAt;
 
 volatile int
-    currentWindowNumber = 0,
-    selectedWindowNumber = 0;
+  currentWindowNumber = 0,
+  selectedWindowNumber = 0;
 
 //Screen 
 int screenFadingTime = 1; //minutes
@@ -189,9 +189,9 @@ SemiAutomaticModeMenu *semiAutoModeMenu = new SemiAutomaticModeMenu("Semi-auto c
 SemiAutomaticModeWindow *semiAutoModeWindow = new SemiAutomaticModeWindow("Semi-auto control window", 121, &u8g, &passedHoles, &targetPassedHoles);
 
 TemplatesMenu *templatesMenu = new TemplatesMenu("Templates", 2, &u8g);
-TShirtTemplate *tShirtTemplate = new TShirtTemplate("T - shirt", 21, 20, &passedHoles, &targetPassedHoles, &u8g);
-SweaterTemplate *sweaterTemplate = new SweaterTemplate("Sweater", 22, 30, &passedHoles, &targetPassedHoles, &u8g);
-HoodyTemplate *hoodyTemplate = new HoodyTemplate("Hoody", 23, 40, &passedHoles, &targetPassedHoles, &u8g);
+TShirtTemplate *tShirtTemplate = new TShirtTemplate("T - shirt", 21, 3.0, &passedHoles, &targetPassedHoles, &u8g);
+SweaterTemplate *sweaterTemplate = new SweaterTemplate("Sweater", 22, 4.2, &passedHoles, &targetPassedHoles, &u8g);
+HoodyTemplate *hoodyTemplate = new HoodyTemplate("Hoody", 23, 5.5, &passedHoles, &targetPassedHoles, &u8g);
 
 CalibrationMenu *calibrationMenu = new CalibrationMenu("Calibration", 3, &u8g);
 CalibrationWindow *calibrationWindow = new CalibrationWindow("Calibration window", 31, &u8g);
@@ -209,7 +209,7 @@ void setup()
   currentReaderValue = digitalRead(M_DIGITAL_READER);
 
   // Menu windows init
-  mainMenu->setPullOfWindows(engineControllerMenu, screenSaver, engineControllerMenu, engineControllerMenu);
+  mainMenu->setPullOfWindows(engineControllerMenu, engineControllerMenu, engineControllerMenu, engineControllerMenu);
   screenSaver->setPullOfWindows(engineControllerMenu, engineControllerMenu, engineControllerMenu, engineControllerMenu);
 
   engineControllerMenu->setPullOfWindows(mainMenu, manualModeMenu, calibrationMenu, templatesMenu);
@@ -222,6 +222,11 @@ void setup()
   tShirtTemplate->setPullOfWindows(templatesMenu, nullptr, hoodyTemplate, sweaterTemplate);
   sweaterTemplate->setPullOfWindows(templatesMenu, nullptr, tShirtTemplate, hoodyTemplate);
   hoodyTemplate->setPullOfWindows(templatesMenu, nullptr, sweaterTemplate, tShirtTemplate);
+
+  //Cannot declarate mmPerHole in constructor, so declaring it through setter here
+  tShirtTemplate->setMMPerHole(mmPerHole);
+  sweaterTemplate->setMMPerHole(mmPerHole);
+  hoodyTemplate->setMMPerHole(mmPerHole);
 
   calibrationMenu->setPullOfWindows(mainMenu, calibrationWindow, templatesMenu, engineControllerMenu);
   calibrationWindow->setPullOfWindows(calibrationMenu, nullptr, nullptr, nullptr);
@@ -241,18 +246,22 @@ void setup()
   displayTime = millis();
   readerTime = millis();
   buttonHoldingTriggeredAt = millis();
+  //This condition (buttonPressedAt and buttonReleasedAt) helps
+  //trigger screenSaver even if button was not pressed (handy for just turned on board)
+  buttonPressedAt = millis() - 1;
+  buttonReleasedAt = millis();
 }
 
 ISR(TIMER2_A)
 {
   //Stepper
   if(isStepperStopped == true 
-      || (currentWindow->number == 121 && 
+      || (currentWindow->index == 121 && 
           targetPassedHoles == passedHoles) 
-      || (currentWindow->number == 111 &&
+      || (currentWindow->index == 111 &&
           passedHoles <= 0 && direction == DOWN)
           //all templates
-      || ((currentWindow->number > 20 && currentWindow->number < 30) && 
+      || ((currentWindow->index > 20 && currentWindow->index < 30) && 
           targetPassedHoles == passedHoles)
     ) {   
     isStepperRunning = false;
@@ -384,9 +393,10 @@ void loop()
   }
 
   // Show screen saver trigger
-  if (millis() - buttonReleasedAt > 10000 && 
+  if (millis() - buttonReleasedAt > 10000 * screenFadingTime && 
       showScreenSaver == false && 
-      buttonReleasedAt > buttonPressedAt) {
+      buttonReleasedAt > buttonPressedAt &&
+      isStepperRunning == false) {
     showScreenSaver = true;
   }
 
@@ -395,7 +405,7 @@ void loop()
   if (millis() - buttonPressedAt > 1000 && buttonReleasedAt <= buttonPressedAt) {
     if (millis() - buttonHoldingTriggeredAt > 50) {
       //Semi auto window button holding
-      if (currentWindow->number == 121) {
+      if (currentWindow->index == 121) {
         if (pressedButtonCode == BUTTON_LEFT_C) {
           if (targetPassedHoles - 1 < 0) {
             targetPassedHoles = 0;
@@ -425,8 +435,8 @@ void loop()
   }
 
   //Track window changing 
-  if (previousWindow->number != currentWindow->number) {
-    if (currentWindow->number != -1) {
+  if (previousWindow->index != currentWindow->index) {
+    if (currentWindow->index != -1) {
       showScreenSaver = false;
     }
     currentWindow->init(isRenderAllowed);

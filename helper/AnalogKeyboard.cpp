@@ -224,11 +224,14 @@ void TemplateWindow::draw(volatile int &passedHoles, double mmPerHole) {
         initNumberLength = (7 + abs((int)(passedHoles * mmPerHole) / 10)) * numberFontSize;
     }
 
+    double amountOfHoles = this->targetPosition/mmPerHole;
+    int roundedAmountOfHoles = (int)(amountOfHoles + 0.5 - (amountOfHoles < 0));
+
     this->u8g->setFont(u8g_font_helvR10);
     this->u8g->setPrintPos(128 / 2 - (this->u8g->getStrWidth(this->title) + 10 * numberFontSize + 3) / 2, 30);
     this->u8g->print(this->title);
     this->u8g->print(" (");
-    this->u8g->print(this->targetPassedHolesForCurrentTemplate * mmPerHole);
+    this->u8g->print(roundedAmountOfHoles * mmPerHole);
     this->u8g->print(" mm)");
 
     this->u8g->setPrintPos(64 - initNumberLength / 2, 52);
@@ -237,12 +240,15 @@ void TemplateWindow::draw(volatile int &passedHoles, double mmPerHole) {
 }
 
 TemplateWindow* TemplateWindow::onSelect(bool &direction, volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode)  {
+    double amountOfHoles = this->targetPosition/this->mmPerHole;
+    int roundedAmountOfHoles = (int)(amountOfHoles + 0.5 - (amountOfHoles < 0));
+
     if (mode == CLICK) {
 
         if (isStepperRunning == true) {
             isStepperRunning = false;
         } else {
-            *this->targetPassedHoles = this->targetPassedHolesForCurrentTemplate;
+            *this->targetPassedHoles = roundedAmountOfHoles;
 
             if (*this->targetPassedHoles > *this->passedHoles) {
                 direction = UP;
