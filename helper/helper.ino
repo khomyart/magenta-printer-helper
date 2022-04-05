@@ -35,9 +35,14 @@ U8GLIB_SH1106_128X64 u8g(U8G_I2C_OPT_NONE);
 #define STEP 4
 #define DIR  5
 
+//Sound speaker
+#define SPEAKER 2
+
+//Timers
 unsigned long time;
 unsigned long readerTime;
 unsigned long displayTime;
+unsigned long speakerTime;
 
 // If keyboard needs calibration
 bool isKeyboardDebugEnabled = false;
@@ -96,6 +101,10 @@ int keyboardDebugging(int analogButtonsReaderPortNumber, bool isMapingEnabled = 
     Serial.println(analogValue);
   }
 }
+
+//Speaker
+bool playSound = false;
+bool isSpeakerTimerSetAllowed = false;
 
 /**
  * @brief is analog signal value meets requirements + - borderWindowValue to buttonsAnalogReaderValue
@@ -174,27 +183,50 @@ double getMMperHole(int amountOfHolesOnWheel, double degreeToGetOneMilimeter)
   return mmPerHole;
 }
 
+void playEdgeSound(const int& speakerPin, const unsigned long& speakerTime, bool& playSound) {
+    if (millis() - speakerTime > 0 &&
+        millis() - speakerTime < 150) {
+      digitalWrite(speakerPin, HIGH);
+    }
+
+    if (millis() - speakerTime > 150 &&
+        millis() - speakerTime < 250) {
+      digitalWrite(speakerPin, LOW);
+    }
+
+    if (millis() - speakerTime > 250 &&
+        millis() - speakerTime < 400) {
+      digitalWrite(speakerPin, HIGH);
+    }
+
+    if (millis() - speakerTime > 400) {
+      digitalWrite(speakerPin, LOW);
+
+      playSound = false;
+    }
+}
+
 //Stepper
 //mode, pul, dir
 AccelStepper stepper(1, STEP, DIR);
 
 // Menu windows logic declaration
-MainMenu *mainMenu = new MainMenu("Main menu", 0, &u8g);
-ScreenSaver *screenSaver = new ScreenSaver("Screen saver", -1, &u8g);
+MainMenu *mainMenu = new MainMenu("Main menu", 0, 0, 0, &u8g);
+ScreenSaver *screenSaver = new ScreenSaver("Screen saver", -1, 0, 0, &u8g);
 
-EngineControllerMenu *engineControllerMenu = new EngineControllerMenu("Engine control", 1, &u8g);
-ManualModeMenu *manualModeMenu = new ManualModeMenu("Manual control", 11, &u8g);
-ManualModeWindow *manualModeWindow = new ManualModeWindow("Manual control window", 111, &u8g);
-SemiAutomaticModeMenu *semiAutoModeMenu = new SemiAutomaticModeMenu("Semi-auto control", 12, &u8g);
-SemiAutomaticModeWindow *semiAutoModeWindow = new SemiAutomaticModeWindow("Semi-auto control window", 121, &u8g, &passedHoles, &targetPassedHoles);
+EngineControllerMenu *engineControllerMenu = new EngineControllerMenu("Engine control", 1, 1, 3, &u8g);
+ManualModeMenu *manualModeMenu = new ManualModeMenu("Manual control", 11, 1, 2, &u8g);
+ManualModeWindow *manualModeWindow = new ManualModeWindow("Manual control window", 111, 0, 0, &u8g);
+SemiAutomaticModeMenu *semiAutoModeMenu = new SemiAutomaticModeMenu("Semi-auto control", 12, 2, 2, &u8g);
+SemiAutomaticModeWindow *semiAutoModeWindow = new SemiAutomaticModeWindow("Semi-auto control window", 121, 0, 0, &u8g, &passedHoles, &targetPassedHoles);
 
-TemplatesMenu *templatesMenu = new TemplatesMenu("Templates", 2, &u8g);
-TShirtTemplate *tShirtTemplate = new TShirtTemplate("T - shirt", 21, 3.0, &passedHoles, &targetPassedHoles, &u8g);
-SweaterTemplate *sweaterTemplate = new SweaterTemplate("Sweater", 22, 4.2, &passedHoles, &targetPassedHoles, &u8g);
-HoodyTemplate *hoodyTemplate = new HoodyTemplate("Hoody", 23, 5.5, &passedHoles, &targetPassedHoles, &u8g);
+TemplatesMenu *templatesMenu = new TemplatesMenu("Templates", 2, 2, 3, &u8g);
+TShirtTemplate *tShirtTemplate = new TShirtTemplate("T - shirt", 21, 1, 3, 3.0, &passedHoles, &targetPassedHoles, &u8g);
+SweaterTemplate *sweaterTemplate = new SweaterTemplate("Sweater", 22, 2, 3, 4.2, &passedHoles, &targetPassedHoles, &u8g);
+HoodyTemplate *hoodyTemplate = new HoodyTemplate("Hoody", 23, 3, 3, 5.5, &passedHoles, &targetPassedHoles, &u8g);
 
-CalibrationMenu *calibrationMenu = new CalibrationMenu("Calibration", 3, &u8g);
-CalibrationWindow *calibrationWindow = new CalibrationWindow("Calibration window", 31, &u8g);
+CalibrationMenu *calibrationMenu = new CalibrationMenu("Calibration", 3, 3, 3, &u8g);
+CalibrationWindow *calibrationWindow = new CalibrationWindow("Calibration window", 31, 0, 0, &u8g);
 
 // Current window holder
 MenuWindow *previousWindow;
@@ -205,6 +237,7 @@ void setup()
   mmPerHole = getMMperHole(amountOfHolesOnWheel, degreeToGetOneMilimeter);
   // Measurement ruler init
   pinMode(M_DIGITAL_READER, INPUT);
+  pinMode(SPEAKER, OUTPUT);
   previousReaderValue = digitalRead(M_DIGITAL_READER);
   currentReaderValue = digitalRead(M_DIGITAL_READER);
 
@@ -245,6 +278,8 @@ void setup()
   time = millis();
   displayTime = millis();
   readerTime = millis();
+  speakerTime = millis();
+  
   buttonHoldingTriggeredAt = millis();
   //This condition (buttonPressedAt and buttonReleasedAt) helps
   //trigger screenSaver even if button was not pressed (handy for just turned on board)
@@ -407,14 +442,14 @@ void loop()
       //Semi auto window button holding
       if (currentWindow->index == 121) {
         if (pressedButtonCode == BUTTON_LEFT_C) {
+          //If targetPassedHoles is less then 0, play sound
           if (targetPassedHoles - 1 < 0) {
-            targetPassedHoles = 0;
-          } else {
-            targetPassedHoles -= 1;
+            isSpeakerTimerSetAllowed = true;
           }
+          currentWindow->onLeft(direction, isStepperRunning, isStepperStopped, CLICK);
         }
         if (pressedButtonCode == BUTTON_RIGHT_C) {
-          targetPassedHoles += 1;
+          currentWindow->onRight(direction, isStepperRunning, isStepperStopped, CLICK);
         }
       }
       buttonHoldingTriggeredAt = millis();
@@ -442,7 +477,7 @@ void loop()
     currentWindow->init(isRenderAllowed);
   }
 
-  //allow render with 10 fps and when current screen is not a screenSaver
+  //Allow render with 10 fps and when current screen is not a screenSaver
   if (isRenderAllowed == true) {
     if ((millis() - displayTime) > 1000 / 10) {
       u8g.firstPage();
@@ -453,5 +488,19 @@ void loop()
 
       displayTime = millis();
     }
+  }
+
+  //Sound playing
+  //If we need to play "stop" or "edge" sound, we need to set
+  //"isSpeakerTimerSetAllowed" variable to true. To stop playing this sound
+  //we need to set "playSound" variable to false
+  if (isSpeakerTimerSetAllowed == true && playSound == false) {
+    speakerTime = millis();
+    isSpeakerTimerSetAllowed = false;
+    playSound = true;
+  }
+
+  if (playSound == true) {
+    playEdgeSound(SPEAKER, speakerTime, playSound);
   }
 }

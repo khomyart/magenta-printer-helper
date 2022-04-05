@@ -227,14 +227,20 @@ void TemplateWindow::draw(volatile int &passedHoles, double mmPerHole) {
     double amountOfHoles = this->targetPosition/mmPerHole;
     int roundedAmountOfHoles = (int)(amountOfHoles + 0.5 - (amountOfHoles < 0));
 
+    this->u8g->setFont(u8g_font_helvR08);
+    this->u8g->setPrintPos(128/2 - 3*5/2, 15);
+    this->u8g->print(this->windowNumber);
+    this->u8g->print("/");
+    this->u8g->print(this->amountOfWindowsOnCurrentLevel);
+
     this->u8g->setFont(u8g_font_helvR10);
-    this->u8g->setPrintPos(128 / 2 - (this->u8g->getStrWidth(this->title) + 10 * numberFontSize + 3) / 2, 30);
+    this->u8g->setPrintPos(128 / 2 - (this->u8g->getStrWidth(this->title) + 10 * numberFontSize + 3) / 2, 34);
     this->u8g->print(this->title);
     this->u8g->print(" (");
     this->u8g->print(roundedAmountOfHoles * mmPerHole);
     this->u8g->print(" mm)");
 
-    this->u8g->setPrintPos(64 - initNumberLength / 2, 52);
+    this->u8g->setPrintPos(64 - initNumberLength / 2, 57);
     this->u8g->print(*this->passedHoles * mmPerHole);
     this->u8g->print(" mm");
 }
