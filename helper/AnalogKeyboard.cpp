@@ -1,10 +1,17 @@
 #include "AnalogKeyboard.h"
+#include "EEPROM.h"
 
 void ScreenSaver::draw(volatile int &passedHoles, double mmPerHole)  {}
 
 ScreenSaver* ScreenSaver::init(volatile bool &isRenderAllowed) {
     isRenderAllowed = false;
     return this;
+}
+
+void MainMenu::draw(volatile int &passedHoles, double mmPerHole)  {
+    this->u8g->setFont(u8g_font_helvR10);
+      this->u8g->setPrintPos(128/2 - u8g->getStrWidth("Magenta print")/2, 39);
+      this->u8g->print("Magenta print");
 }
 
 void CalibrationWindow::draw(volatile int &passedHoles, double mmPerHole)  {
@@ -28,14 +35,16 @@ void CalibrationWindow::draw(volatile int &passedHoles, double mmPerHole)  {
 }
 
 CalibrationWindow* CalibrationWindow::onSelect(bool &direction, volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode)  {
+    int eepromAddress = 0;
     if (mode == CLICK) {
         passedHoles = 0;
+        EEPROM.put(eepromAddress, passedHoles);
     }
 
     return this;
 };
 
-CalibrationWindow* CalibrationWindow::onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
+CalibrationWindow* CalibrationWindow::onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode) {
     direction = DOWN;
     //run stepper on click
     if (mode == CLICK) {
@@ -54,7 +63,7 @@ CalibrationWindow* CalibrationWindow::onLeft(bool &direction, volatile bool &isS
 
     return this;
 };
-CalibrationWindow* CalibrationWindow::onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
+CalibrationWindow* CalibrationWindow::onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode) {
     direction = UP;
     //run stepper on release
     if (mode == CLICK) {
@@ -121,7 +130,7 @@ SemiAutomaticModeWindow* SemiAutomaticModeWindow::onSelect(bool &direction, vola
     return this;
 };
 
-SemiAutomaticModeWindow* SemiAutomaticModeWindow::onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
+SemiAutomaticModeWindow* SemiAutomaticModeWindow::onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode) {
     //run stepper on click
     if (mode == CLICK) {
         if (*this->targetPassedHoles - 1 < 0) {
@@ -138,7 +147,7 @@ SemiAutomaticModeWindow* SemiAutomaticModeWindow::onLeft(bool &direction, volati
 
     return this;
 };
-SemiAutomaticModeWindow* SemiAutomaticModeWindow::onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
+SemiAutomaticModeWindow* SemiAutomaticModeWindow::onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode) {
     //run stepper on release
     if (mode == CLICK) {
         *this->targetPassedHoles += 1;
@@ -173,7 +182,7 @@ void ManualModeWindow::draw(volatile int &passedHoles, double mmPerHole) {
     this->u8g->print(" mm");
 }
 
-ManualModeWindow* ManualModeWindow::onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
+ManualModeWindow* ManualModeWindow::onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode) {
     direction = DOWN;
     //run stepper on click
     if (mode == CLICK) {
@@ -192,7 +201,7 @@ ManualModeWindow* ManualModeWindow::onLeft(bool &direction, volatile bool &isSte
 
     return this;
 };
-ManualModeWindow* ManualModeWindow::onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
+ManualModeWindow* ManualModeWindow::onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode) {
     direction = UP;
     //run stepper on release
     if (mode == CLICK) {

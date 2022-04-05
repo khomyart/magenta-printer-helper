@@ -119,7 +119,7 @@ class MenuWindow {
 
       return this;
     };
-    virtual MenuWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
+    virtual MenuWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode) {
       if (mode == CLICK) {
         if (this->prevMenu != nullptr) {
           return this->prevMenu;
@@ -133,7 +133,7 @@ class MenuWindow {
       return this;
       
     };
-    virtual MenuWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode) {
+    virtual MenuWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode) {
       if (mode == CLICK) {
         if (this->nextMenu != nullptr) {
           return this->nextMenu;
@@ -165,6 +165,8 @@ class MainMenu : public MenuWindow {
       title, index, windowNumber, amountOfWindowsOnCurrentLevel,
       u8g, higherLevelMenu, lowerLevelMenu,
       prevMenu, nextMenu) {}
+
+    void draw(volatile int &passedHoles, double mmPerHole);
 };
 
 class ScreenSaver : public MenuWindow {
@@ -356,8 +358,8 @@ class CalibrationWindow : public MenuWindow {
     void draw(volatile int &passedHoles, double mmPerHole);
     
     CalibrationWindow* onSelect(bool &direction, volatile int &passedHoles, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
-    CalibrationWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
-    CalibrationWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    CalibrationWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode);
+    CalibrationWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode);
 };
 
 class CalibrationMenu : public MenuWindow {
@@ -423,8 +425,8 @@ class ManualModeWindow : public MenuWindow {
     
     void draw(volatile int& passedHoles, double mmPerHole);
 
-    ManualModeWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
-    ManualModeWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    ManualModeWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode);
+    ManualModeWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode);
 };
 
 class SemiAutomaticModeMenu : public MenuWindow {
@@ -477,8 +479,8 @@ class SemiAutomaticModeWindow : public MenuWindow {
     void draw(volatile int& passedHoles, double mmPerHole);
 
     SemiAutomaticModeWindow* onSelect(bool &direction, volatile int& passedHoles, volatile bool& isStepperRunning, volatile bool& isStepperStopped, int mode);
-    SemiAutomaticModeWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
-    SemiAutomaticModeWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, int mode);
+    SemiAutomaticModeWindow* onLeft(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode);
+    SemiAutomaticModeWindow* onRight(bool &direction, volatile bool &isStepperRunning, volatile bool &isStepperStopped, bool& isSpeakerTimerSetAllowed, int mode);
 };
 
 

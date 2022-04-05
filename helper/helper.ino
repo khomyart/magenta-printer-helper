@@ -1,6 +1,7 @@
 #include <U8glib.h>
 #include <GyverTimers.h>
 #include <AccelStepper.h>
+#include <EEPROM.h>
 
 #include "AnalogKeyboard.h"
 
@@ -105,6 +106,10 @@ int keyboardDebugging(int analogButtonsReaderPortNumber, bool isMapingEnabled = 
 //Speaker
 bool playSound = false;
 bool isSpeakerTimerSetAllowed = false;
+
+//EEPROM
+//ALSO declared in AnalogKeyboard.cpp in CalibrationWindow::onSelect
+int eepromAddress = 0;
 
 /**
  * @brief is analog signal value meets requirements + - borderWindowValue to buttonsAnalogReaderValue
@@ -233,7 +238,8 @@ MenuWindow *previousWindow;
 MenuWindow *currentWindow;
 
 void setup()
-{
+{ 
+  EEPROM.get(eepromAddress, passedHoles);
   mmPerHole = getMMperHole(amountOfHolesOnWheel, degreeToGetOneMilimeter);
   // Measurement ruler init
   pinMode(M_DIGITAL_READER, INPUT);
@@ -291,8 +297,10 @@ ISR(TIMER2_A)
 {
   //Stepper
   if(isStepperStopped == true 
+          //Semi-auto stepper controlling window
       || (currentWindow->index == 121 && 
           targetPassedHoles == passedHoles) 
+          //Manual stepper controlling window
       || (currentWindow->index == 111 &&
           passedHoles <= 0 && direction == DOWN)
           //all templates
@@ -325,16 +333,18 @@ ISR(TIMER2_A)
     if (direction == DOWN)
     {
       passedHoles -= 1;
+      EEPROM.put(eepromAddress, passedHoles);
     }
     else
     {
       passedHoles += 1;
+      EEPROM.put(eepromAddress, passedHoles);
     }
   }
   previousReaderValue = digitalRead(M_DIGITAL_READER);
 
   //Keyboard
-  if ((millis() - time) > 400)
+  if ((millis() - time) > 50)
   {
     pressedButtonCode = getPressedButtonCode(analogRead(B_ANALOG_READER));
 
@@ -358,12 +368,12 @@ ISR(TIMER2_A)
 
       case BUTTON_LEFT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onLeft(direction, isStepperRunning, isStepperStopped, CLICK);
+        currentWindow = currentWindow->onLeft(direction, isStepperRunning, isStepperStopped, isSpeakerTimerSetAllowed, CLICK);
         break;
 
       case BUTTON_RIGHT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onRight(direction, isStepperRunning, isStepperStopped, CLICK);
+        currentWindow = currentWindow->onRight(direction, isStepperRunning, isStepperStopped, isSpeakerTimerSetAllowed, CLICK);
         break;
       
       default:
@@ -397,12 +407,12 @@ ISR(TIMER2_A)
 
       case BUTTON_LEFT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onLeft(direction, isStepperRunning, isStepperStopped, RELEASE);
+        currentWindow = currentWindow->onLeft(direction, isStepperRunning, isStepperStopped, isSpeakerTimerSetAllowed, RELEASE);
         break;
 
       case BUTTON_RIGHT_C:
         previousWindow = currentWindow;
-        currentWindow = currentWindow->onRight(direction, isStepperRunning, isStepperStopped, RELEASE);
+        currentWindow = currentWindow->onRight(direction, isStepperRunning, isStepperStopped, isSpeakerTimerSetAllowed, RELEASE);
         break;
 
       default:
@@ -411,6 +421,7 @@ ISR(TIMER2_A)
     }
 
     previouslyPressedButtonCode = getPressedButtonCode(analogRead(B_ANALOG_READER));
+    time = millis();
   }
 }
 
@@ -428,7 +439,7 @@ void loop()
   }
 
   // Show screen saver trigger
-  if (millis() - buttonReleasedAt > 10000 * screenFadingTime && 
+  if (millis() - buttonReleasedAt > 60000 * screenFadingTime && 
       showScreenSaver == false && 
       buttonReleasedAt > buttonPressedAt &&
       isStepperRunning == false) {
@@ -442,14 +453,10 @@ void loop()
       //Semi auto window button holding
       if (currentWindow->index == 121) {
         if (pressedButtonCode == BUTTON_LEFT_C) {
-          //If targetPassedHoles is less then 0, play sound
-          if (targetPassedHoles - 1 < 0) {
-            isSpeakerTimerSetAllowed = true;
-          }
-          currentWindow->onLeft(direction, isStepperRunning, isStepperStopped, CLICK);
+          currentWindow->onLeft(direction, isStepperRunning, isStepperStopped, isSpeakerTimerSetAllowed, CLICK);
         }
         if (pressedButtonCode == BUTTON_RIGHT_C) {
-          currentWindow->onRight(direction, isStepperRunning, isStepperStopped, CLICK);
+          currentWindow->onRight(direction, isStepperRunning, isStepperStopped, isSpeakerTimerSetAllowed, CLICK);
         }
       }
       buttonHoldingTriggeredAt = millis();
@@ -490,11 +497,33 @@ void loop()
     }
   }
 
+  //Speaker
+  //Play sound on manual window stepper controller
+  //when user trying to rise platform more then calibrated
+  //zero level (Manual mode window)
+  if (currentWindow->index == 111 &&
+      passedHoles <= 0 && direction == DOWN && 
+      pressedButtonCode == BUTTON_LEFT_C &&
+      isSpeakerTimerSetAllowed == false &&
+      playSound == false) {
+    isSpeakerTimerSetAllowed = true;
+  }
+
+  //(Semi-auto mode window)
+  if (currentWindow->index == 121 &&
+      targetPassedHoles - 1 < 0 &&
+      pressedButtonCode == BUTTON_LEFT_C &&
+      isSpeakerTimerSetAllowed == false &&
+      playSound == false) {
+    isSpeakerTimerSetAllowed = true;
+  }
+
   //Sound playing
   //If we need to play "stop" or "edge" sound, we need to set
   //"isSpeakerTimerSetAllowed" variable to true. To stop playing this sound
   //we need to set "playSound" variable to false
   if (isSpeakerTimerSetAllowed == true && playSound == false) {
+    Serial.println("sound played");
     speakerTime = millis();
     isSpeakerTimerSetAllowed = false;
     playSound = true;
