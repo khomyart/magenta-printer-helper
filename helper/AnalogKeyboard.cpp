@@ -9,9 +9,10 @@ ScreenSaver* ScreenSaver::init(volatile bool &isRenderAllowed) {
 }
 
 void MainMenu::draw(volatile int &passedHoles, double mmPerHole)  {
-    this->u8g->setFont(u8g_font_helvR10);
-      this->u8g->setPrintPos(128/2 - u8g->getStrWidth("Magenta print")/2, 39);
-      this->u8g->print("Magenta print");
+    // this->u8g->setFont(u8g_font_helvR10);
+    // this->u8g->setPrintPos(128/2 - u8g->getStrWidth("Magenta print")/2, 39);
+    // this->u8g->print("Magenta print");
+    this->u8g->drawBitmapP(128/2-92/2, 64/2-38/2, 12, 38, this->logo);
 }
 
 void CalibrationWindow::draw(volatile int &passedHoles, double mmPerHole)  {

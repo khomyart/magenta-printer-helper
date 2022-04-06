@@ -150,11 +150,14 @@ class MenuWindow {
 
 class MainMenu : public MenuWindow {
   public:
+    unsigned char* logo;
+
     MainMenu(
       char* title,
       int index,
       int windowNumber,
       int amountOfWindowsOnCurrentLevel,
+      unsigned char logo [],
       U8GLIB_SH1106_128X64* u8g,
       MenuWindow* higherLevelMenu = nullptr,
       MenuWindow* lowerLevelMenu = nullptr,
@@ -164,7 +167,9 @@ class MainMenu : public MenuWindow {
     MenuWindow(
       title, index, windowNumber, amountOfWindowsOnCurrentLevel,
       u8g, higherLevelMenu, lowerLevelMenu,
-      prevMenu, nextMenu) {}
+      prevMenu, nextMenu) {
+        this->logo = logo;
+      }
 
     void draw(volatile int &passedHoles, double mmPerHole);
 };
